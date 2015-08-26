@@ -1,0 +1,6 @@
+[submodule "3rd/libuv"]
+	path = 3rd/libuv
+	url = https://github.com/libuv/libuv.git
+[submodule "3rd/http-parser"]
+	path = 3rd/http-parser
+	url = https://github.com/joyent/http-parser.git
