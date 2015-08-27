@@ -11,11 +11,11 @@ A lightweight and fast enough WSGI server for Python.
 
 And these 3rd-party library are used in hydrus:
 
-+ http-parse
++ http-parser
 + libuv
 
 that's all :smile:
 
 # License
 -------------------------------------
-BSD
+BSD License
