@@ -11,8 +11,6 @@ cdef extern from "server.h" namespace "hydrus":
     cdef cppclass HttpServer:
         HttpServer(const char * addr, int port) nogil
         void run()
-        const char * address()
-        int port()
 
 
 # ----------------------------------------------

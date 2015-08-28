@@ -4,3 +4,8 @@
 *.o
 *.obj
 /build
+*.suo
+*.sdf
+*.opensdf
+msvc-build/Debug
+msvc-build/Release

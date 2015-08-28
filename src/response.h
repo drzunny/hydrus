@@ -1,18 +1,26 @@
 #ifndef HYDRUS_HTTP_RESPONSE_H
 #define HYDRUS_HTTP_RESPONSE_H
 
+#include "request.h"
+#include "common.hpp"
+
 namespace hydrus
 {
-    class Response
+    class Response: DISALLOW_COPY
     {
     private:
-        int code_;
-        int contentType_;
-        int mimeType_;
-        int body_;
+        Request req_;
+        bool    applied_or_raised_;
+
     public:
-        Response();
-        void toString() const;
+        Response(Request && req);
+        ~Response();
+
+        void            apply();
+        Buffer          data();
+
+        static Buffer   raise(int statusCode);
+        static bool     isFixedBuffer(const char * p);
     };
 }
 
