@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <memory>
-#include "common.hpp"
+#include "base.hpp"
 
 namespace hydrus
 {
@@ -11,18 +11,16 @@ namespace hydrus
     {
     public:
         class RequestImpl;
+        static void ready();
     private:
         std::shared_ptr<RequestImpl> impl_;
 
     public:
         Request();
-        Request(const hydrus::Buffer & buf);
+        Request(hydrus::Buffer && buf);
         Request(Request && r);
-
-        bool            parse(const char * buffer, size_t sz);
-        const char *    get(const char * name) const;
-
-        static void ready();
+        
+        bool parse(hydrus::Buffer && buf);
     };
 }
 

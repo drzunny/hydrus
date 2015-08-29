@@ -1,19 +1,25 @@
 #ifndef HYDRUS_HTTP_SERVER_H
 #define HYDRUS_HTTP_SERVER_H
 
-#include "common.hpp"
+#include "base.hpp"
+#include <cstdint>
+#include <string>
 
 namespace hydrus
 {
+    typedef void WSGICallback(void*, size_t);
+
     class HttpServer: DISALLOW_COPY
     {
     private:
-        char address_[40];
-        int port_;
-        // disallow copy a instance
-        HttpServer(const HttpServer & other) {}
-    private:
-        HttpServer(const char * addr, int port);
+        typedef std::string Str;
+        HttpServer() {}
+    public:
+        static HttpServer * createServer();
+        static void release();
+
+        void setup(WSGICallback cb);
+        void listen(const Str & host, int port);
         void run();
     };
 }

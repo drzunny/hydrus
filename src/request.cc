@@ -1,6 +1,7 @@
 #include "request.h"
 #include "http_parser.h"
 
+#include <vector>
 #include <string>
 #include <unordered_map>
 
@@ -13,7 +14,25 @@ static http_parser_settings rq_setting;
 // ------------------------------------------------
 //  helpers
 // ------------------------------------------------
+struct header_s {
+    string field;
+    string value;
+};
 
+struct request_s {
+    string url;
+    string method;
+    string nh_field;
+    string nh_value;
+    int statusCode;
+    bool nh_openning;
+    hydrus::Buffer body;
+
+    vector<header_s> headers;
+
+    request_s() : headers(vector<header_s>(16)), nh_openning(false) { headers.reserve(16); }
+    ~request_s() { headers.clear(); headers.shrink_to_fit(); }
+};
 
 
 
@@ -26,30 +45,29 @@ private:
     bool already_parsed_;
     http_parser parser_;
     size_t headerIter_;
-    unordered_map<string, string> fields_;
+    request_s req_;
 
 public:
     RequestImpl() :already_parsed_(false), headerIter_(0) {}
-    RequestImpl(const hydrus::Buffer & buf) :already_parsed_(false), headerIter_(0)
+    RequestImpl(hydrus::Buffer && buf) :already_parsed_(false), headerIter_(0)
     {
-        if (this->parse(buf.buf, buf.sz))
+        if (this->parse(move(buf)))
             already_parsed_ = true;
     }
 
 
-    bool parse(const char * buffer, size_t sz)
+    bool parse(hydrus::Buffer && buf)
     {
         http_parser_init(&parser_, HTTP_REQUEST);        
         parser_.data = this;
 
-        size_t nread = http_parser_execute(&parser_, &rq_setting, buffer, sz);
-        return !(nread < sz);
+        size_t nread = http_parser_execute(&parser_, &rq_setting, buf.data(), buf.len);
+        return !(nread < buf.len);
     }
 
 
-    void set(const char * name, const char * value)
-    {
-        fields_.insert(make_pair(name, value));
+    request_s & raw() {
+        return req_;
     }
 
 
@@ -81,39 +99,64 @@ _parser_on_msgbegin(http_parser * pa)   {
 static int
 _parser_on_url(http_parser * pa, const char * at, size_t n) {
     REQIMPL * r = (REQIMPL*)pa->data;
-    r->set("url", string(at, n).c_str());
-
+    r->raw().url = at;
     return 0;
 }
 
 
 static int
 _parser_on_headfield(http_parser * pa, const char * at, size_t n) {
-    REQIMPL * r = (REQIMPL*)pa->data;    
+    REQIMPL * r = (REQIMPL*)pa->data;
+    r->raw().nh_field = string(at, n);
+    r->raw().nh_openning = true;
+
+    return 0;
 }
 
 
 static int
 _parser_on_headvalue(http_parser * pa, const char * at, size_t n) {
     REQIMPL * r = (REQIMPL*)pa->data;
+    r->raw().nh_value = string(at, n);
+    r->raw().nh_openning = false;
+
+    header_s header = { move(r->raw().nh_field), move(r->raw().nh_value) };
+    r->raw().headers.push_back(move(header));
+
+    return 0;
 }
 
 
 static int
 _parser_on_headerdone(http_parser * pa) {
     REQIMPL * r = (REQIMPL*)pa->data;
+    if (r->raw().nh_openning)
+        return -1;
+
+    return 0;
 }
 
 
 static int
 _parser_on_body(http_parser * pa, const char * at, size_t n) {
     REQIMPL * r = (REQIMPL*)pa->data;
+
+    if (n < 0) return -1;
+    auto & rs = r->raw();
+    rs.body = hydrus::Buffer(at, n);
+
+    return 0;
 }
 
 
 static int
 _parser_on_msgdone(http_parser * pa)   {
     REQIMPL * r = (REQIMPL*)pa->data;
+
+    r->raw().method = http_method_str((http_method)pa->method);
+    r->raw().statusCode = pa->status_code;
+
+    return 0;
 }
 
 
@@ -138,7 +181,7 @@ hydrus::Request::Request() : impl_(make_shared<hydrus::Request::RequestImpl>())
 }
 
 
-hydrus::Request::Request(const hydrus::Buffer & buf) : impl_(make_shared<hydrus::Request::RequestImpl>(buf))
+hydrus::Request::Request(hydrus::Buffer && buf) : impl_(make_shared<hydrus::Request::RequestImpl>(move(buf)))
 {
 }
 
@@ -149,15 +192,9 @@ hydrus::Request::Request(hydrus::Request && r) : impl_(std::move(r.impl_))
 
 
 bool 
-hydrus::Request::parse(const char * buffer, size_t sz)
+hydrus::Request::parse(hydrus::Buffer && buf)
 {
-    return impl_->parse(buffer, sz);
-}
-
-const char *
-hydrus::Request::get(const char * name) const
-{
-    return impl_->get(name);
+    return impl_->parse(move(buf));
 }
 
 

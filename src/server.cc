@@ -61,28 +61,28 @@ onwrite_end:
 
 static void
 _hy_onread(uv_stream_t * client, ssize_t nread, const uv_buf_t * buf)    {
-    if (nread < 0)  {        
+    if (nread < 0)  {
         uv_close((uv_handle_t*)client, _hy_onclientclose);
         return;
     }
 
-    hydrus::Request req(hydrus::Buffer(buf->base, nread));
-    unique_ptr<hydrus::Buffer> buffer(new hydrus::Buffer());
+    hydrus::Request req;
+    hydrus::Buffer * buffer = new hydrus::Buffer();
 
-    if (req.parse(buf->base, buf->len)) 
+    if (req.parse(hydrus::Buffer(buf->base, buf->len)))
     {
         hydrus::Response resp(std::move(req));
         resp.apply();
         *buffer = resp.data();
     }
-    else  
+    else
     {
         *buffer = hydrus::Response::raise(400);
     }
 
-    uv_write_t * w = new uv_write_t;
-    uv_buf_t data = uv_buf_init(buffer->buf, buffer->sz);
-    w->data = buffer->buf;
+    uv_write_t * w = (uv_write_t*)malloc(sizeof(uv_write_t));
+    uv_buf_t data = uv_buf_init(buffer->data(), buffer->len);
+    w->data = buffer;
 
     uv_write(w, client, &data, 1, _hy_onwrite);
 }
@@ -110,7 +110,7 @@ static void
 _http_listen(const char * addr, int port, bool ipv6=false)   {
     hy_loop = uv_default_loop();
     uv_tcp_init(hy_loop, &hy_server);
-    
+
 
     sockaddr * ip = NULL;
     if (ipv6)   {
@@ -133,11 +133,38 @@ _http_start()   {
 // ------------------------------------------------
 //  HTTP Server implementation
 // ------------------------------------------------
-hydrus::HttpServer::HttpServer(const char * addr, int port) : port_(port)
+static hydrus::HttpServer * s_server = nullptr;
+
+hydrus::HttpServer *
+hydrus::HttpServer::createServer()
 {
-    memcpy(address_, addr, strlen(addr));
-    _http_listen(addr, port);
+    if (s_server == nullptr)
+        s_server = new HttpServer();
+    return s_server;
 }
+
+
+void
+hydrus::HttpServer::release()
+{
+    if (s_server == nullptr)
+        return;
+    delete s_server;
+    s_server = nullptr;
+}
+
+
+void
+hydrus::HttpServer::setup(hydrus::WSGICallback cb)
+{
+}
+
+
+void hydrus::HttpServer::listen(const string & addr, int port)
+{
+    _http_listen(addr.c_str(), port);
+}
+
 
 void hydrus::HttpServer::run()
 {

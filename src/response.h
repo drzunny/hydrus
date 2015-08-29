@@ -2,7 +2,7 @@
 #define HYDRUS_HTTP_RESPONSE_H
 
 #include "request.h"
-#include "common.hpp"
+#include "base.hpp"
 
 namespace hydrus
 {
