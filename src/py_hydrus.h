@@ -11,7 +11,6 @@ extern "C" {
 
 typedef void(PyObject*) WSGICallback
 
-void hydrus_init();
 void hydrus_listen(const char * addr, int port, int ip6_enabled);
 void hydrus_run(WSGICallback app);
 

@@ -1,9 +1,10 @@
 #ifndef HYDRUS_HTTP_SERVER_H
 #define HYDRUS_HTTP_SERVER_H
 
-#include "base.hpp"
+#include "base/nocopy.hpp"
 #include <cstdint>
 #include <string>
+#include <memory>
 
 namespace hydrus
 {
@@ -15,7 +16,7 @@ namespace hydrus
         typedef std::string Str;
         HttpServer() {}
     public:
-        static HttpServer * createServer();
+        static std::unique_ptr<HttpServer> createServer();
         static void release();
 
         void setup(WSGICallback cb);

@@ -3,7 +3,8 @@
 
 #include <cstdint>
 #include <memory>
-#include "base.hpp"
+#include "base/nocopy.hpp"
+#include "base/buffer.hpp"
 
 namespace hydrus
 {

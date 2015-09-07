@@ -1,5 +1,4 @@
 #include "server.h"
-#include "stream.h"
 #include "request.h"
 #include "response.h"
 
@@ -38,19 +37,22 @@ _hy_onallocate(uv_handle_t * hnd, size_t suggest, uv_buf_t * buf)    {
 
 static void
 _hy_onclientclose(uv_handle_t * hnd)    {
+    free(hnd);
 }
 
 
 static void
 _hy_onwrite(uv_write_t * writer, int status)   {
+    hydrus::Buffer * buffer = nullptr;
     if (status < 0) {
         goto onwrite_end;
     }
 
     // if this is not a short response
-    if (writer->data != nullptr && !hydrus::Response::isFixedBuffer((const char *)writer->data))
+    if (writer->data != nullptr)
     {
-        free(writer->data);
+        buffer = (hydrus::Buffer*)writer->data;
+        delete buffer;
     }
 
 onwrite_end:
@@ -81,7 +83,7 @@ _hy_onread(uv_stream_t * client, ssize_t nread, const uv_buf_t * buf)    {
     }
 
     uv_write_t * w = (uv_write_t*)malloc(sizeof(uv_write_t));
-    uv_buf_t data = uv_buf_init(buffer->data(), buffer->len);
+    uv_buf_t data = uv_buf_init(buffer->data(), buffer->length());
     w->data = buffer;
 
     uv_write(w, client, &data, 1, _hy_onwrite);
@@ -111,7 +113,6 @@ _http_listen(const char * addr, int port, bool ipv6=false)   {
     hy_loop = uv_default_loop();
     uv_tcp_init(hy_loop, &hy_server);
 
-
     sockaddr * ip = NULL;
     if (ipv6)   {
         ip = (sockaddr*)malloc(sizeof(sockaddr_in));
@@ -135,12 +136,12 @@ _http_start()   {
 // ------------------------------------------------
 static hydrus::HttpServer * s_server = nullptr;
 
-hydrus::HttpServer *
+unique_ptr<hydrus::HttpServer>
 hydrus::HttpServer::createServer()
 {
     if (s_server == nullptr)
         s_server = new HttpServer();
-    return s_server;
+    return unique_ptr<HttpServer>(s_server);
 }
 
 

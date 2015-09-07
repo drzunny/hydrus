@@ -61,8 +61,8 @@ public:
         http_parser_init(&parser_, HTTP_REQUEST);        
         parser_.data = this;
 
-        size_t nread = http_parser_execute(&parser_, &rq_setting, buf.data(), buf.len);
-        return !(nread < buf.len);
+        size_t nread = http_parser_execute(&parser_, &rq_setting, buf.data(), buf.length());
+        return !(nread < buf.length());
     }
 
 

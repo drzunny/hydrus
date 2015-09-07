@@ -2,7 +2,8 @@
 #define HYDRUS_HTTP_RESPONSE_H
 
 #include "request.h"
-#include "base.hpp"
+#include "base/nocopy.hpp"
+#include "base/buffer.hpp"
 
 namespace hydrus
 {
@@ -20,7 +21,6 @@ namespace hydrus
         Buffer          data();
 
         static Buffer   raise(int statusCode);
-        static bool     isFixedBuffer(const char * p);
     };
 }
 

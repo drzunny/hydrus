@@ -1,5 +1,6 @@
 #include "response.h"
 
+#include "base/alloc.hpp"
 #include <memory>
 
 using namespace std;
@@ -17,13 +18,7 @@ static char hy_fixed_buffer[FIXED_SIZE];
 // ----------------------------------------
 //  Helpers
 // ----------------------------------------
-
-
-
-
-// ----------------------------------------
-//  Response pimpl class
-// ----------------------------------------
+static hydrus::BlockMemory<512 * 1024, 4 * 1024> _memories;
 
 
 
@@ -59,11 +54,4 @@ hydrus::Response::data()
     if (!applied_or_raised_) 
         return hydrus::Buffer();
     return hydrus::Buffer();
-}
-
-
-bool
-hydrus::Response::isFixedBuffer(const char* p)
-{
-    return p >= &hy_fixed_buffer[0] && p <= &hy_fixed_buffer[FIXED_SIZE - 1];
 }
