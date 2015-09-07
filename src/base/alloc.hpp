@@ -24,7 +24,7 @@ namespace hydrus
         typedef std::queue<int> Queue;
 
         // data fields
-        char data [TOTAL];
+        char data[TOTAL];
         Queue blocks;
 
         // functions
@@ -54,17 +54,17 @@ namespace hydrus
         {
             if (n <= EACH - sizeof(short) && !blocks.empty())
             {
-                char * fixedData = &root[EACH * blocks.front()];
-                ((short*)prefix)[0] = FANTASTY_PREFIX;
+                char * fixedData = &data[EACH * blocks.front()];
+                ((short*)fixedData)[0] = FANTASTY_PREFIX;
 
                 blocks.pop();
                 return fixedData + sizeof(short);
             }
             else
             {
-                char * allocData = ::malloc(n + sizeof(short));
+                char * allocData = (char*)::malloc(n + sizeof(short));
                 ((short*)allocData)[0] = 0;
-                return allocData + sizeof(short)
+                return allocData + sizeof(short);
             }
         }
 
