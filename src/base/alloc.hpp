@@ -1,11 +1,11 @@
 #ifndef HYDRUS_BASE_ALLOC_H
 #define HYDRUS_BASE_ALLOC_H
 
-#include <queue>
+#include "./bqueue.hpp"
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <memory.h>
-#include <math.h>
 
 
 #define FANTASTY_PREFIX 0xBEEF
@@ -13,67 +13,55 @@
 namespace hydrus
 {
     template<size_t TOTAL=1, size_t EACH=1>
-    struct BlockMemory
+    class BlockMemory
     {
+    public:
         enum BlockProperties
         {
             BM_TOTAL = TOTAL,
             BM_EACH = EACH,
             BM_BLOCKS = TOTAL / EACH
         };
-        typedef std::queue<int> Queue;
+        typedef BlockQueue<TOTAL/EACH> Queue;
 
-        // data fields
-        char data[TOTAL];
-        Queue blocks;
+    private:
+        char data_[TOTAL];
+        Queue blocks_;
 
-        // functions
+        inline int _getIndex(char * ptr)
+        {
+            return ((ptr - sizeof(short)) - &data_[0]) / EACH;
+        }
+
+    public:
+        BlockMemory() {}
         inline static bool isBlockMemory(char * ptr)
         {
             return ((short*)(ptr - sizeof(short)))[0] != 0;
-        }
-
-        BlockMemory()
-        {
-            memset(data, 0, TOTAL);
-            for (int i = 0; i < TOTAL / EACH; i++)
-                blocks.push(i);
-        }
-
-        inline int getIndex(char * ptr)
-        {
-            if (!this->isBlockMemory(ptr))
-                return -1;
-
-            char * root = &data[0];
-            return ((ptr - sizeof(short)) - root) / EACH;
-        }
-
-
+        }       
+        
         inline char * malloc(size_t n)
         {
-            if (n <= EACH - sizeof(short) && !blocks.empty())
+            char * allocData = nullptr;
+            if (n <= EACH - sizeof(short) && !blocks_.empty())
             {
-                char * fixedData = &data[EACH * blocks.front()];
-                ((short*)fixedData)[0] = FANTASTY_PREFIX;
-
-                blocks.pop();
-                return fixedData + sizeof(short);
+                allocData = &data_[EACH * blocks_.pop()];
+                ((short*)allocData)[0] = FANTASTY_PREFIX;
             }
             else
             {
-                char * allocData = (char*)::malloc(n + sizeof(short));
+                allocData = (char*)::malloc(n + sizeof(short));
                 ((short*)allocData)[0] = 0;
-                return allocData + sizeof(short);
             }
+            return allocData + sizeof(short);
         }
 
         inline void free(char * ptr)
         {
             if (this->isBlockMemory(ptr))
             {
-                int index = this->getIndex(ptr);
-                blocks.push(index);
+                int index = this->_getIndex(ptr);
+                blocks_.push(index);
             }
             else
             {
@@ -88,8 +76,8 @@ namespace hydrus
             {
                 if (n <= EACH - sizeof(short))
                     return ptr;
-                int index = this->getIndex(ptr);
-                blocks.push(index);
+                int index = this->_getIndex(ptr);
+                blocks_.push(index);
 
                 char * newdata = this->malloc(n + sizeof(short));
                 ((short*)newdata)[0] = 0;
@@ -102,10 +90,10 @@ namespace hydrus
             }
         }
 
-        inline void copy(const char * data, size_t n)
+        inline void copy(const char * buf, size_t n)
         {
             char * newdata = this->malloc(n);
-            memcpy(newdata, data, n);
+            memcpy(newdata, buf, n);
         }
     };
 }

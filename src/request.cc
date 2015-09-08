@@ -24,7 +24,7 @@ struct request_s {
     string method;
     string nh_field;
     string nh_value;
-    int statusCode;
+    size_t statusCode;
     bool nh_openning;
     hydrus::Buffer body;
 
@@ -141,7 +141,7 @@ static int
 _parser_on_body(http_parser * pa, const char * at, size_t n) {
     REQIMPL * r = (REQIMPL*)pa->data;
 
-    if (n < 0) return -1;
+    if (n == 0) return -1;
     auto & rs = r->raw();
     rs.body = hydrus::Buffer(at, n);
 
@@ -154,7 +154,7 @@ _parser_on_msgdone(http_parser * pa)   {
     REQIMPL * r = (REQIMPL*)pa->data;
 
     r->raw().method = http_method_str((http_method)pa->method);
-    r->raw().statusCode = pa->status_code;
+    r->raw().statusCode = (size_t)pa->status_code;
 
     return 0;
 }
