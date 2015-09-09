@@ -58,7 +58,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -78,7 +78,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

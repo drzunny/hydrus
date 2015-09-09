@@ -13,6 +13,8 @@ namespace hydrus
     public:
         class RequestImpl;
         static void ready();
+        static BlockAllocator allocator;
+
     private:
         std::shared_ptr<RequestImpl> impl_;
 

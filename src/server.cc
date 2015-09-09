@@ -1,6 +1,7 @@
 #include "server.h"
 #include "request.h"
 #include "response.h"
+#include "base/alloc.hpp"
 
 #include <memory>
 #include <Python.h>

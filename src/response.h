@@ -21,6 +21,7 @@ namespace hydrus
         Buffer          data();
 
         static Buffer   raise(int statusCode);
+        static BlockAllocator allocator;
     };
 }
 

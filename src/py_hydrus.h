@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-typedef void(PyObject*) WSGICallback
+typedef void(*WSGICallback)(PyObject*);
 
 void hydrus_listen(const char * addr, int port, int ip6_enabled);
 void hydrus_run(WSGICallback app);

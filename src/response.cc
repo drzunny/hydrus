@@ -25,6 +25,8 @@ static hydrus::BlockMemory<512 * 1024, 4 * 1024> _memories;
 // ----------------------------------------
 //  Response class implementation
 // ----------------------------------------
+hydrus::BlockAllocator hydrus::Response::allocator = hydrus::BlockAllocator();
+
 hydrus::Response::Response(hydrus::Request && req) : req_(move(req))
 {
 }

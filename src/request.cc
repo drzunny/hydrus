@@ -1,12 +1,12 @@
 #include "request.h"
 #include "http_parser.h"
+#include "base/alloc.hpp"
 
 #include <vector>
 #include <string>
 #include <unordered_map>
 
 using namespace std;
-
 
 static http_parser_settings rq_setting;
 
@@ -176,6 +176,8 @@ _parser_ready() {
 // ------------------------------------------------
 //  Request parser handler
 // ------------------------------------------------
+hydrus::BlockAllocator hydrus::Request::allocator = hydrus::BlockAllocator();
+
 hydrus::Request::Request() : impl_(make_shared<hydrus::Request::RequestImpl>())
 {
 }

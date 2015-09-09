@@ -2,13 +2,12 @@
 #define HYDRUS_BASE_ALLOC_H
 
 #include "./bqueue.hpp"
-
 #include <stdlib.h>
 #include <stdint.h>
 #include <memory.h>
 
 
-#define FANTASTY_PREFIX 0xBEEF
+#define FANTASTY_PREFIX (0xbeef)
 
 namespace hydrus
 {

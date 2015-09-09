@@ -5,7 +5,10 @@
 #include "nocopy.hpp"
 
 namespace hydrus
-{   
+{
+    typedef BlockMemory<512 * 1024, 4096> BlockAllocator;
+    static BlockAllocator BufferAlloc_;
+
     //  This is a Buffer wrapper for BlockMemory's data
     // -----------------------------------------------
     class Buffer: DISALLOW_COPY
@@ -19,14 +22,11 @@ namespace hydrus
         Buffer(Buffer && rv) : len_(rv.len_), base_(rv.base_) {}
         Buffer(const char * buf, size_t n) : len_(n)
         {
-            base_ = (char*)malloc(n + sizeof(short));
-            ((short*)base_)[0] = 0;
-            base_ = base_ + sizeof(short);
+            base_ = BufferAlloc_.malloc(n);
         }
         ~Buffer()
         {
-            if (!BlockMemory<>::isBlockMemory(base_))
-                free((char*)(base_ - sizeof(short)));
+            BufferAlloc_.free(base_);
         }
 
         Buffer & operator=(Buffer && b)
