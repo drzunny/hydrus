@@ -42,6 +42,10 @@ cdef extern from "server.h" namespace "hydrus":
         void run()
 
 
+# Global Instance
+cdef Server* G_hy_server = NULL
+G_hy_app = None
+
 # ----------------------------------------------
 #  Hydrus Server Wrapper
 # ----------------------------------------------
@@ -63,10 +67,10 @@ cdef class _HydrusResponse:
         environ = {'Server': 'hydrus %s' % __VERSION__}
         return environ
 
-    cdef bool send_header(self, const Client& client, const Request& req):
-        return False
+    cdef bint send_header(self, const Client& client, const Request& req):
+        return 0
 
-    cdef start_response(self, const char * status, dict headers, exec_info=None):
+    def start_response(self, const char * status, dict headers, exec_info=None):
         pass
 
 
@@ -89,7 +93,7 @@ cdef void _hydrus_response_callback(const Client& client, const Request& req):
 # ----------------------------------------------
 def listen(app, const char* addr, int port):
     global G_hy_server, G_hy_app
-    if G_hy_server:
+    if G_hy_server is not NULL:
         return
     G_hy_server = new Server(_hydrus_response_callback)
     G_hy_app = app
@@ -97,7 +101,7 @@ def listen(app, const char* addr, int port):
 
 
 def run(app, host=None, port=None):
-    if G_hy_server is None:
+    if G_hy_server is NULL:
         assert host is not None and port is not None, 'Cannot initialize hydrus server'
         listen(app, host, port)
     G_hy_server.run()

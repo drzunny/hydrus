@@ -19,7 +19,7 @@ else:
     HYDRUS_INCLUDES = []
     HYDRUS_LIBRARIES = ['uv']
     HYDRUS_BUILD_FLAGS = ['-std=c++11','-fno-strict-aliasing', '-fcommon', '-fPIC',
-                          '-Wall', '-Wextra', '-Wno-unused-parameter','Wno-missing-field-initializers', '-O2']
+                          '-Wall', '-Wextra', '-Wno-unused-parameter','-Wno-missing-field-initializers', '-O2']
 
 # Source files
 HYDRUS_SRC_FILES = glob.glob('hydrus/*.cc') + ['hydrus/_hydrus.pyx']
@@ -52,7 +52,6 @@ setup(
     author='drz',
     keywords=('wsgi', 'server', 'web'),
     url='',
-    setup_requires=['setuptools_cython', 'Cython'],
     ext_modules=cythonize([
         Extension(
             'hydrus._hydrus', HYDRUS_SRC_FILES,
