@@ -25,7 +25,7 @@ cdef extern from "request.h" namespace "hydrus":
         size_t status_code
         vector[Headers] headers
         char * body
-        bool keepalive
+        bint keepalive
 
 
 
@@ -54,16 +54,17 @@ cdef class _HydrusResponse:
 
     cdef void _raise_error(self, const Client& client, int code):
         if code in CONST_HYDRUS_ERROR_RESPONSE:
-            client.send(CONST_HYDRUS_ERROR_RESPONSE[code])
+            message = CONST_HYDRUS_ERROR_RESPONSE[code]
+            client.send(message, len(message))
         else:
-            client.send('\r\n')
+            client.send('\r\n', 2)
 
     cdef to_environ(self, const Request & request):
         environ = {'Server': 'hydrus %s' % __VERSION__}
         return environ
 
-    cdef void send_header(self, const Client& client, const Request& req):
-        pass
+    cdef bool send_header(self, const Client& client, const Request& req):
+        return False
 
     cdef start_response(self, const char * status, dict headers, exec_info=None):
         pass
@@ -86,16 +87,17 @@ cdef void _hydrus_response_callback(const Client& client, const Request& req):
 # ----------------------------------------------
 #  Main API of hydrus
 # ----------------------------------------------
-def listen(app, addr, port):
+def listen(app, const char* addr, int port):
     global G_hy_server, G_hy_app
     if G_hy_server:
         return
-    G_hy_server = new HttpServer()
-    G_hy_app = G_hy_app
+    G_hy_server = new Server(_hydrus_response_callback)
+    G_hy_app = app
+    G_hy_server.listen(addr, port)
 
 
 def run(app, host=None, port=None):
     if G_hy_server is None:
         assert host is not None and port is not None, 'Cannot initialize hydrus server'
-        listen(host, port)
+        listen(app, host, port)
     G_hy_server.run()
