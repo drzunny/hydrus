@@ -1,8 +1,5 @@
 #include "server.h"
 #include "request.h"
-#include "response.h"
-#include "base/alloc.hpp"
-
 #include <memory>
 #include <Python.h>
 #include <uv.h>
@@ -16,7 +13,6 @@ using namespace std;
 
 static uv_loop_t *  hy_loop;
 static uv_tcp_t     hy_server;
-static uv_tcp_t     hy_client;
 
 
 // ------------------------------------------------
@@ -44,50 +40,26 @@ _hy_onclientclose(uv_handle_t * hnd)    {
 
 static void
 _hy_onwrite(uv_write_t * writer, int status)   {
-    hydrus::Buffer * buffer = nullptr;
-    if (status < 0) {
-        goto onwrite_end;
-    }
-
-    // if this is not a short response
-    if (writer->data != nullptr)
-    {
-        buffer = (hydrus::Buffer*)writer->data;
-        delete buffer;
-    }
-
-onwrite_end:
-    uv_close((uv_handle_t*)writer->handle, _hy_onclientclose);
     free(writer);
 }
 
 
 static void
-_hy_onread(uv_stream_t * client, ssize_t nread, const uv_buf_t * buf)    {
+_hy_onread(uv_stream_t * stream, ssize_t nread, const uv_buf_t * buf)    {
+    auto client = (hydrus::Client*)stream->data;
+    auto server = (hydrus::Server*)hy_server.data;
+
     if (nread < 0)  {
-        uv_close((uv_handle_t*)client, _hy_onclientclose);
+        delete client;
         return;
     }
 
-    hydrus::Request req;
-    hydrus::Buffer * buffer = new hydrus::Buffer();
+    hydrus::Request req(buf->base, nread);
+    server->callback(*client, req);
 
-    if (req.parse(hydrus::Buffer(buf->base, buf->len)))
-    {
-        hydrus::Response resp(std::move(req));
-        resp.apply();
-        *buffer = resp.data();
-    }
-    else
-    {
-        *buffer = hydrus::Response::raise(400);
-    }
-
-    uv_write_t * w = (uv_write_t*)malloc(sizeof(uv_write_t));
-    uv_buf_t data = uv_buf_init(buffer->data(), buffer->length());
-    w->data = buffer;
-
-    uv_write(w, client, &data, 1, _hy_onwrite);
+    // release old buffer
+    free(buf->base);
+    delete client;
 }
 
 
@@ -97,12 +69,15 @@ _hy_onconnection(uv_stream_t * server, int status) {
         // TODO: on error for connection
         return;
     }
-    if (!uv_accept(server, (uv_stream_t*)&hy_client))
+    uv_tcp_t * tcpClient = new uv_tcp_t;
+    hydrus::Client * client = new hydrus::Client((void*)tcpClient);
+    if (!uv_accept(server, (uv_stream_t*)&tcpClient))
     {
-        uv_read_start((uv_stream_t*)&hy_client, _hy_onallocate, _hy_onread);
+        tcpClient->data = (void*)client;
+        uv_read_start((uv_stream_t*)&tcpClient, _hy_onallocate, _hy_onread);
     }
     else
-        uv_close((uv_handle_t*)&hy_client, _hy_onclientclose);
+        delete client;
 }
 
 
@@ -110,7 +85,7 @@ _hy_onconnection(uv_stream_t * server, int status) {
 //  HTTP by libuv
 // ------------------------------------------------
 static void
-_http_listen(const char * addr, int port, bool ipv6=false)   {
+_http_listen(hydrus::Server * server, const char * addr, int port, bool ipv6=false)   {
     hy_loop = uv_default_loop();
     uv_tcp_init(hy_loop, &hy_server);
 
@@ -123,6 +98,8 @@ _http_listen(const char * addr, int port, bool ipv6=false)   {
         uv_ip6_addr(addr, port, (sockaddr_in6*)ip);
     }
     uv_tcp_bind(&hy_server, ip, 0);
+
+    hy_server.data = (void*)server;
     uv_listen((uv_stream_t*)&hy_server, HTTP_LISTEN_BACKLOG, _hy_onconnection);
 }
 
@@ -132,43 +109,56 @@ _http_start()   {
     uv_run(hy_loop, UV_RUN_DEFAULT);
 }
 
+
+// ------------------------------------------------
+//  HTTP Client implementation
+// ------------------------------------------------
+class hydrus::Client::ClientImpl
+{
+public:
+    uv_tcp_t * client = nullptr;
+
+    ClientImpl(uv_tcp_t * tcp) : client(tcp) {}
+    ~ClientImpl() { uv_close((uv_handle_t*)client, _hy_onclientclose); }
+};
+
+
+hydrus::Client::Client(void * hnd) : impl_(new ClientImpl((uv_tcp_t*)hnd))
+{    
+}
+
+
+hydrus::Client::~Client()
+{
+    delete impl_;
+}
+
+
+void
+hydrus::Client::send(const char * buf, size_t sz)
+{
+    uv_write_t * w = new uv_write_t;
+    char * buffer = new char[sz];
+    memcpy(buffer, buf, sz);
+    uv_buf_t data = uv_buf_init(buffer, sz);
+    w->data = buffer;
+    uv_write(w, (uv_stream_t*)impl_->client, &data, 1, _hy_onwrite);
+}
+
+
+
 // ------------------------------------------------
 //  HTTP Server implementation
 // ------------------------------------------------
-static hydrus::HttpServer * s_server = nullptr;
-
-unique_ptr<hydrus::HttpServer>
-hydrus::HttpServer::createServer()
+void 
+hydrus::Server::listen(const char * addr, int port)
 {
-    if (s_server == nullptr)
-        s_server = new HttpServer();
-    return unique_ptr<HttpServer>(s_server);
+    _http_listen(this, addr, port);
 }
 
 
-void
-hydrus::HttpServer::release()
-{
-    if (s_server == nullptr)
-        return;
-    delete s_server;
-    s_server = nullptr;
-}
-
-
-void
-hydrus::HttpServer::setup(hydrus::WSGICallback cb)
-{
-}
-
-
-void hydrus::HttpServer::listen(const string & addr, int port)
-{
-    _http_listen(addr.c_str(), port);
-}
-
-
-void hydrus::HttpServer::run()
+void 
+hydrus::Server::run()
 {
     _http_start();
 }

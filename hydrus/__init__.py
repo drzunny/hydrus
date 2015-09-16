@@ -2,7 +2,7 @@
 
 import _hydrus
 
-__VERSION__ = '0.1.0'
+__VERSION__ = _hydrus.__VERSION__
 __author__ = 'drz'
 __email__ = 'drzunny@hotmail.com'
 

@@ -18,33 +18,18 @@
     <ClInclude Include="..\src\request.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\response.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\server.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\3rd\http-parser\http_parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\base\alloc.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\base\buffer.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\base\nocopy.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\base\bqueue.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\request.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\response.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\server.cc">

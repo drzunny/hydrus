@@ -2,28 +2,47 @@
 #define HYDRUS_HTTP_REQUEST_H
 
 #include <cstdint>
-#include <memory>
+#include <string>
+#include <vector>
 #include "base/nocopy.hpp"
-#include "base/buffer.hpp"
 
 namespace hydrus
 {
+    struct Headers
+    {
+        std::string name;
+        std::string value;
+    };
+
+
     class Request: DISALLOW_COPY
     {
     public:
         class RequestImpl;
-        static void ready();
-        static BlockAllocator allocator;
+        static bool parserReady;
 
     private:
-        std::shared_ptr<RequestImpl> impl_;
+        typedef std::string Str;
+        typedef std::vector<Headers> HeadersList;
+
+        RequestImpl* impl_;
+        bool already_parsed_;
 
     public:
-        Request();
-        Request(hydrus::Buffer && buf);
-        Request(Request && r);
+        Request(const char * buffer, size_t nread);
+        ~Request();
+
+        // Check
+        bool isParsed() const;
+
+        // Request fields
+        Str         url;
+        Str         method;
+        size_t      status_code; 
+        HeadersList headers;
+        char *      body;
+        bool        keepalive;
         
-        bool parse(hydrus::Buffer && buf);
     };
 }
 

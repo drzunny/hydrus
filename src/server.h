@@ -2,25 +2,38 @@
 #define HYDRUS_HTTP_SERVER_H
 
 #include "base/nocopy.hpp"
+#include "request.h"
+
 #include <cstdint>
-#include <string>
-#include <memory>
 
 namespace hydrus
 {
-    typedef void WSGICallback(void*, size_t);
-
-    class HttpServer: DISALLOW_COPY
+    // Connection
+    class Client : DISALLOW_COPY
     {
-    private:
-        typedef std::string Str;
-        HttpServer() {}
     public:
-        static std::unique_ptr<HttpServer> createServer();
-        static void release();
+        Client(void * hnd);
+        ~Client();
+        void send(const char * buf, size_t n);
 
-        void setup(WSGICallback cb);
-        void listen(const Str & host, int port);
+    private:
+        class ClientImpl;
+        ClientImpl* impl_;
+    };
+
+
+    // The WSGI Callback
+    typedef void (*WSGICallback)(const Client& client, const Request& request);
+
+
+    // WSGI Server
+    class Server: DISALLOW_COPY
+    {
+    public:
+        WSGICallback callback;
+
+        Server(WSGICallback cb) : callback(cb) {}
+        void listen(const char * host, int port);
         void run();
     };
 }

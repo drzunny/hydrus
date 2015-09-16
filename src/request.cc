@@ -1,6 +1,5 @@
 #include "request.h"
 #include "http_parser.h"
-#include "base/alloc.hpp"
 
 #include <vector>
 #include <string>
@@ -9,30 +8,8 @@
 using namespace std;
 
 static http_parser_settings rq_setting;
-
-
-// ------------------------------------------------
-//  helpers
-// ------------------------------------------------
-struct header_s {
-    string field;
-    string value;
-};
-
-struct request_s {
-    string url;
-    string method;
-    string nh_field;
-    string nh_value;
-    size_t statusCode;
-    bool nh_openning;
-    hydrus::Buffer body;
-
-    vector<header_s> headers;
-
-    request_s() : headers(vector<header_s>(16)), nh_openning(false) { headers.reserve(16); }
-    ~request_s() { headers.clear(); headers.shrink_to_fit(); }
-};
+static bool rq_openning = false;
+static hydrus::Headers rq_temp;
 
 
 
@@ -42,45 +19,15 @@ struct request_s {
 class hydrus::Request::RequestImpl
 {
 private:
-    bool already_parsed_;
-    http_parser parser_;
-    size_t headerIter_;
-    request_s req_;
+    hydrus::Request * parent_;
 
 public:
-    RequestImpl() :already_parsed_(false), headerIter_(0) {}
-    RequestImpl(hydrus::Buffer && buf) :already_parsed_(false), headerIter_(0)
-    {
-        if (this->parse(move(buf)))
-            already_parsed_ = true;
-    }
+    http_parser parser;
+    bool openning;
+    size_t hcounter;
+    Headers temp;
 
-
-    bool parse(hydrus::Buffer && buf)
-    {
-        http_parser_init(&parser_, HTTP_REQUEST);        
-        parser_.data = this;
-
-        size_t nread = http_parser_execute(&parser_, &rq_setting, buf.data(), buf.length());
-        return !(nread < buf.length());
-    }
-
-
-    request_s & raw() {
-        return req_;
-    }
-
-
-    const char * get(const char * name) const
-    {
-        if (!already_parsed_) return nullptr;
-    }
-
-
-    bool isParsed() const
-    {
-        return already_parsed_;
-    }
+    RequestImpl(Request * parent) :parent_(parent), hcounter(0), openning(false)  {}
 };
 
 
@@ -88,7 +35,7 @@ public:
 // ------------------------------------------------
 //  http-parser functions
 // ------------------------------------------------
-#define REQIMPL hydrus::Request::RequestImpl
+#define REQ hydrus::Request
 
 static int
 _parser_on_msgbegin(http_parser * pa)   {
@@ -98,30 +45,27 @@ _parser_on_msgbegin(http_parser * pa)   {
 
 static int
 _parser_on_url(http_parser * pa, const char * at, size_t n) {
-    REQIMPL * r = (REQIMPL*)pa->data;
-    r->raw().url = at;
+    REQ * r = (REQ*)pa->data;
+    r->url = at;
     return 0;
 }
 
 
 static int
 _parser_on_headfield(http_parser * pa, const char * at, size_t n) {
-    REQIMPL * r = (REQIMPL*)pa->data;
-    r->raw().nh_field = string(at, n);
-    r->raw().nh_openning = true;
-
+    rq_temp.name = string(at, n);
+    rq_openning = true;
     return 0;
 }
 
 
 static int
 _parser_on_headvalue(http_parser * pa, const char * at, size_t n) {
-    REQIMPL * r = (REQIMPL*)pa->data;
-    r->raw().nh_value = string(at, n);
-    r->raw().nh_openning = false;
+    REQ * r = (REQ*)pa->data;
 
-    header_s header = { move(r->raw().nh_field), move(r->raw().nh_value) };
-    r->raw().headers.push_back(move(header));
+    rq_temp.value = string(at, n);
+    rq_openning = false;
+    r->headers.push_back(rq_temp);
 
     return 0;
 }
@@ -129,38 +73,34 @@ _parser_on_headvalue(http_parser * pa, const char * at, size_t n) {
 
 static int
 _parser_on_headerdone(http_parser * pa) {
-    REQIMPL * r = (REQIMPL*)pa->data;
-    if (r->raw().nh_openning)
+    if (rq_openning)
         return -1;
-
     return 0;
 }
 
 
 static int
 _parser_on_body(http_parser * pa, const char * at, size_t n) {
-    REQIMPL * r = (REQIMPL*)pa->data;
+    REQ * r = (REQ*)pa->data;
 
     if (n == 0) return -1;
-    auto & rs = r->raw();
-    rs.body = hydrus::Buffer(at, n);
-
+    r->body = new char[n];
+    memcpy(r->body, at, n);
     return 0;
 }
 
 
 static int
 _parser_on_msgdone(http_parser * pa)   {
-    REQIMPL * r = (REQIMPL*)pa->data;
+    REQ * r = (REQ*)pa->data;
 
-    r->raw().method = http_method_str((http_method)pa->method);
-    r->raw().statusCode = (size_t)pa->status_code;
-
+    r->method = http_method_str((http_method)pa->method);
+    r->status_code = (size_t)pa->status_code;
     return 0;
 }
 
 
-static void
+static bool
 _parser_ready() {
     rq_setting.on_message_begin = _parser_on_msgbegin;
     rq_setting.on_url = _parser_on_url;
@@ -169,6 +109,8 @@ _parser_ready() {
     rq_setting.on_headers_complete = _parser_on_headerdone;
     rq_setting.on_body = _parser_on_body;
     rq_setting.on_message_complete = _parser_on_msgdone;
+
+    return true;
 }
 
 
@@ -176,32 +118,31 @@ _parser_ready() {
 // ------------------------------------------------
 //  Request parser handler
 // ------------------------------------------------
-hydrus::BlockAllocator hydrus::Request::allocator = hydrus::BlockAllocator();
-
-hydrus::Request::Request() : impl_(make_shared<hydrus::Request::RequestImpl>())
+hydrus::Request::Request(const char * buffer, size_t nread) :     
+    already_parsed_(false),
+    body(nullptr)
 {
+    impl_ = new hydrus::Request::RequestImpl(this);
+    impl_->parser.data = (void*)this;
+    http_parser_execute(&impl_->parser, &rq_setting, buffer, nread);
 }
 
 
-hydrus::Request::Request(hydrus::Buffer && buf) : impl_(make_shared<hydrus::Request::RequestImpl>(move(buf)))
+hydrus::Request::~Request()
 {
-}
-
-
-hydrus::Request::Request(hydrus::Request && r) : impl_(std::move(r.impl_))
-{
+    if (body != nullptr)
+        free(body);
+    delete impl_;
 }
 
 
 bool 
-hydrus::Request::parse(hydrus::Buffer && buf)
+hydrus::Request::isParsed() const
 {
-    return impl_->parse(move(buf));
+    return already_parsed_;
 }
 
-
-void
-hydrus::Request::ready()
-{
-    _parser_ready();
-}
+//
+//  This is a little hack to initialize the parser setting without any `init` function 
+//
+bool hydrus::Request::parserReady = _parser_ready();
