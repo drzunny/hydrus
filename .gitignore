@@ -9,3 +9,7 @@
 *.opensdf
 msvc-build/Debug
 msvc-build/Release
+/hydrus/_hydrus.cpp
+/build
+/dist
+/hydrus.egg-info

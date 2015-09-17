@@ -69,12 +69,14 @@ _hy_onconnection(uv_stream_t * server, int status) {
         // TODO: on error for connection
         return;
     }
-    uv_tcp_t * tcpClient = new uv_tcp_t;
-    hydrus::Client * client = new hydrus::Client((void*)tcpClient);
-    if (!uv_accept(server, (uv_stream_t*)&tcpClient))
+    uv_tcp_t * socket = new uv_tcp_t;
+    uv_tcp_init(hy_loop, socket);
+
+    hydrus::Client * client = new hydrus::Client((void*)socket);
+    if (!uv_accept(server, (uv_stream_t*)socket))
     {
-        tcpClient->data = (void*)client;
-        uv_read_start((uv_stream_t*)&tcpClient, _hy_onallocate, _hy_onread);
+        socket->data = (void*)client;
+        uv_read_start((uv_stream_t*)socket, _hy_onallocate, _hy_onread);
     }
     else
         delete client;
@@ -124,7 +126,13 @@ public:
 
 
 hydrus::Client::Client(void * hnd) : impl_(new ClientImpl((uv_tcp_t*)hnd))
-{    
+{
+    uv_tcp_t * tcp = (uv_tcp_t*)hnd;
+
+    sockaddr_in addr;
+    int len;
+    uv_tcp_getsockname(tcp, (sockaddr*)&addr, &len);
+    uv_ip4_name(&addr, remote_address_, len);
 }
 
 
@@ -135,7 +143,7 @@ hydrus::Client::~Client()
 
 
 void
-hydrus::Client::send(const char * buf, size_t sz)
+hydrus::Client::send(const char * buf, size_t sz) const
 {
     uv_write_t * w = new uv_write_t;
     char * buffer = new char[sz];
@@ -146,18 +154,17 @@ hydrus::Client::send(const char * buf, size_t sz)
 }
 
 
-
 // ------------------------------------------------
 //  HTTP Server implementation
 // ------------------------------------------------
-void 
+void
 hydrus::Server::listen(const char * addr, int port)
 {
     _http_listen(this, addr, port);
 }
 
 
-void 
+void
 hydrus::Server::run()
 {
     _http_start();

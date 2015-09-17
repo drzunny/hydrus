@@ -14,10 +14,12 @@ namespace hydrus
     public:
         Client(void * hnd);
         ~Client();
-        void send(const char * buf, size_t n);
+        void send(const char * buf, size_t n) const;
+        inline const char * remoteAddress() const { return &(remote_address_[0]); }
 
     private:
         class ClientImpl;
+        char remote_address_[48];
         ClientImpl* impl_;
     };
 

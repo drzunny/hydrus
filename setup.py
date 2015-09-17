@@ -12,9 +12,10 @@ from Cython.Build import cythonize
 #  Prepare for source file and build options
 # ---------------------------------------------
 if platform.system() == 'Windows':
-    HYDRUS_INCLUDES = ['3rd/libuv/include']
-    HYDRUS_LIBRARIES = ['libuv']
-    HYDRUS_BUILD_FLAGS = []
+    HYDRUS_INCLUDES = ['3rd/prebuilt/include']
+    HYDRUS_LIBRARIES = ['libuv', 'ws2_32', 'IPHLPAPI', 'Psapi', 'Userenv', 'advapi32']
+    HYDRUS_LIBPATH = ['3rd/prebuilt/libs']
+    HYDRUS_BUILD_FLAGS = ['/MT']
 else:
     HYDRUS_INCLUDES = []
     HYDRUS_LIBRARIES = ['uv']
@@ -22,7 +23,7 @@ else:
                           '-Wall', '-Wextra', '-Wno-unused-parameter','-Wno-missing-field-initializers', '-O2']
 
 # Source files
-HYDRUS_SRC_FILES = glob.glob('hydrus/*.cc') + ['hydrus/_hydrus.pyx']
+HYDRUS_SRC_FILES = glob.glob('hydrus/*.cc') + glob.glob('hydrus/*.c') + ['hydrus/_hydrus.pyx']
 # Define Macros
 HYDRUS_MACROS = []
 
@@ -34,9 +35,10 @@ def get_version():
     ver = '0.1.0'
     with open(hydrus_file, 'r') as f:
         text = f.read()
-        matches = re.findall(r'__version__\s*=\s*(\S+)', text, re.I)
+        matches = re.findall(r'__version__\s*=\s*\'(\S+)\'', text, re.I)
         if matches:
             ver = matches[0]
+            print('================\nCurrent Version is: %s\n================' % matches[0])
     return ver
 
 
@@ -56,6 +58,7 @@ setup(
         Extension(
             'hydrus._hydrus', HYDRUS_SRC_FILES,
             include_dirs=HYDRUS_INCLUDES,
+            library_dirs=HYDRUS_LIBPATH,
             language='c++',
             libraries=HYDRUS_LIBRARIES,
             extra_compile_args=HYDRUS_BUILD_FLAGS,

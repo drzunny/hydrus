@@ -40,6 +40,7 @@ namespace hydrus
         Str         method;
         size_t      status_code; 
         HeadersList headers;
+        size_t      content_length;
         char *      body;
         bool        keepalive;
         
