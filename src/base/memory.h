@@ -1,0 +1,5 @@
+#ifndef HYDRUS_BASE_MEMORY_H
+#define HYDRUS_BASE_MEMORY_H
+
+
+#endif

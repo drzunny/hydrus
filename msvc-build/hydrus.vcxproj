@@ -10,6 +10,22 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\base\memory.cc" />
+    <ClCompile Include="..\src\http_parser.c" />
+    <ClCompile Include="..\src\hy_core.cc" />
+    <ClCompile Include="..\src\server.cc" />
+    <ClCompile Include="..\src\wsgi.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\base\definition.hpp" />
+    <ClInclude Include="..\src\base\memory.h" />
+    <ClInclude Include="..\src\base\nocopy.hpp" />
+    <ClInclude Include="..\src\http_parser.h" />
+    <ClInclude Include="..\src\hy_core.h" />
+    <ClInclude Include="..\src\server.h" />
+    <ClInclude Include="..\src\wsgi.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F2C3097A-FC73-4F0D-915A-9FF9991C9D63}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -41,13 +57,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)..\3rd\libuv\include;$(PYTHON_HOME)\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)..\3rd\libuv\Debug\lib;$(PYTHON_HOME)\libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)..\3rd\prebuilt\include;$(PYTHON_HOME)\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)..\3rd\prebuilt\libs;$(PYTHON_HOME)\libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)..\3rd\libuv\include;$(PYTHON_HOME)\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)..\3rd\libuv\Release\lib;$(PYTHON_HOME)\libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)..\3rd\prebuilt\include;$(PYTHON_HOME)\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)..\3rd\prebuilt\libs;$(PYTHON_HOME)\libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -64,7 +80,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\3rd\libuv\Debug\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libuv.lib;python27.lib;ws2_32.lib;psapi.lib;Iphlpapi.lib;userenv.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>python27.lib;ws2_32.lib;psapi.lib;Iphlpapi.lib;userenv.lib;libuvd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -86,20 +102,9 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(SolutionDir)..\3rd\libuv\Release\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libuv.lib;python27.lib;ws2_32.lib;psapi.lib;Iphlpapi.lib;userenv.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>python27.lib;ws2_32.lib;psapi.lib;Iphlpapi.lib;userenv.lib;libuv.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="..\3rd\http-parser\http_parser.h" />
-    <ClInclude Include="..\src\base\nocopy.hpp" />
-    <ClInclude Include="..\src\request.h" />
-    <ClInclude Include="..\src\server.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\3rd\http-parser\http_parser.c" />
-    <ClCompile Include="..\src\request.cc" />
-    <ClCompile Include="..\src\server.cc" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

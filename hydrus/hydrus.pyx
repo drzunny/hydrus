@@ -1,4 +1,5 @@
 # -*- coding:utf8 -*-
+import sys
 
 from libcpp.string cimport string
 from libcpp.vector cimport vector
@@ -64,7 +65,7 @@ cdef class _HydrusResponse:
         self.response_header = ''
         self.headers = []
 
-    cdef void _raise_error(self, const Client& client, int code):
+    cdef void raise_error(self, const Client& client, int code):
         if code in CONST_HYDRUS_ERROR_RESPONSE:
             message = CONST_HYDRUS_ERROR_RESPONSE[code]
             client.send(message, len(message))
@@ -72,16 +73,28 @@ cdef class _HydrusResponse:
             client.send('\r\n', 2)
 
     cdef to_environ(self, const Client& client, const Request & request):
-        environ = {'Server': 'hydrus %s' % __VERSION__}
+        environ = {'SERVER': 'hydrus %s' % __VERSION__}
 
-        environ['Url'] = request.url.c_str()
-        environ['Method'] = request.method.c_str()
-        environ['Keepalive'] = not (not request.keepalive)
+        environ['PATH_INFO'] = request.url.c_str()
+        environ['REQUEST_METHOD'] = request.method.c_str()
+        environ['KEEPALIVE'] = not (not request.keepalive)
         environ['REMOTE_ADDR'] = client.remoteAddress()
+        environ['PATH_INFO'] = request.url.c_str()
+
+        # WSGI parameters
+        environ['wsgi.errors'] = sys.stderr
+        environ['wsgi.file_wrapper'] = None
+        environ['SCRIPT_NAME'] = ''
+        environ['wsgi.version'] = (0, 1, 0)
+        environ['wsgi.multithread'] = False
+        environ['wsgi.multiprocess'] = True
+        environ['wsgi.run_once'] = False
+        environ['wsgi.url_scheme'] = 'http'
 
         cdef int n = request.headers.size()
         for _i in range(n):
             environ[request.headers[_i].name.c_str()] = request.headers[_i].value.c_str()
+        return environ
 
     cdef write(self, data):
         if not self.response_header:
@@ -89,7 +102,8 @@ cdef class _HydrusResponse:
                 self.response_header += '%s: %s\r\n' % (name, val)
             self.client.send(self.response_header, len(self.response_header))
 
-        self.client.send(data, len(data))
+        if data:
+            self.client.send(data, len(data))
 
     def start_response(self, const char * status, headers, exec_info=None):
         if exec_info:
@@ -100,8 +114,10 @@ cdef class _HydrusResponse:
                 exec_info = None
 
         self.status = status
+        prefix = 'HTTP/1.1 %s\r\n' % status
+        self.client.send(prefix, len(prefix))
         self.headers = headers
-        return self.write
+        self.write('\r\n')
 
 
 cdef void _hydrus_response_callback(const Client& client, const Request& req):
@@ -109,12 +125,17 @@ cdef void _hydrus_response_callback(const Client& client, const Request& req):
     response.client = &client
     environ = response.to_environ(client, req)
 
-    retval = G_hy_app(environ, response.start_response)
-    if not response.response_header:
-        response.raise_error(400)
-    else:
-        for rs in retval:
-            client.send(rs, len(rs))
+    try:
+        retval = G_hy_app(environ, response.start_response)
+        if not response.response_header:
+            response.raise_error(client, 400)
+        else:
+            for rs in retval:
+                client.send(rs, len(rs))
+    except:
+        import traceback
+        traceback.print_exc()
+        response.raise_error(client, 500)
 
 
 # ----------------------------------------------

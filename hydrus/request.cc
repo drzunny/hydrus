@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <Python.h>
 
 using namespace std;
 
@@ -28,7 +29,7 @@ public:
     Headers temp;
 
     RequestImpl(Request * parent) :parent_(parent), hcounter(0), openning(false)  
-    {
+    {        
         http_parser_init(&parser, HTTP_REQUEST);
     }
 };
