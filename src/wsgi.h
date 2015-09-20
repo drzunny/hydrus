@@ -31,9 +31,6 @@ namespace hydrus
 
         /* WSGI */
         const char * WSGI_URL_SCHEME;
-        const char * WSGI_VERSION;
-        bool         WSGI_MULTIPROCESS;
-        bool         WSGI_MULTITHREAD;
 
         /* HTTP */
         const char * SERVER_SOFTWARE;
