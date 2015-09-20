@@ -5,22 +5,54 @@
 
 namespace hydrus
 {
-    typedef void * WSGIClient;
+    // Data structure
+    struct RefBuf
+    {
+        const char * buf;
+        size_t length;
+    };
 
+    // Declare the core WSGI Application
+    struct WSGIClient;
     class WSGIApplication : DISALLOW_COPY
     {
     public:
-        WSGIApplication(WSGIClient client) {}
-        void append(const char * buf, size_t nread) {}
-        bool parse() { return false; }
-        void execute() {  }
-        void raise(int statusCode) {}
+        WSGIApplication();
+        ~WSGIApplication() {}
+
+        void    append(const char * buf, size_t nread);
+        bool    parse();
+        void    execute();
+        void    raise(int statusCode);
+        void *  client();
+
+        // Properties
+        // ---------------------------------
+
+        /* WSGI */
+        const char * WSGI_URL_SCHEME;
+        const char * WSGI_VERSION;
+        bool         WSGI_MULTIPROCESS;
+        bool         WSGI_MULTITHREAD;
+
+        /* HTTP */
+        const char * SERVER_SOFTWARE;
+        const char * SERVER_NAME;
+        const char * SERVER_PORT;
+        const char * SERVER_PROTOCOL;
+        const char * REQUEST_METHOD;
+        const char * PATH_INFO;
+        const char * QUERY_STRING;
+        const char * CONTENT_LENGTH;
+        const char * REMOTE_ADDR;
 
     private:
-        WSGIClient      client_;
-        const char *    buffer_;
-        size_t          nread_;
+        WSGIClient*      client_;
     };
+
+    // Declare the WSGI Callback
+    typedef void(*WSGICallback)(WSGIApplication&);
+    void WSGIReady(WSGICallback callback);
 }
 
 #endif

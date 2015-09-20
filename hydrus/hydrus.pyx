@@ -18,7 +18,7 @@ CONST_HYDRUS_ERROR_RESPONSE = {
 # ----------------------------------------------
 #  C++ definitions
 # ----------------------------------------------
-cdef extern from "request.h" namespace "hydrus":
+cdef extern from "../src/request.h" namespace "hydrus":
     cdef cppclass Headers:
         string name
         string value
@@ -33,7 +33,7 @@ cdef extern from "request.h" namespace "hydrus":
 
 
 
-cdef extern from "server.h" namespace "hydrus":
+cdef extern from "../src/server.h" namespace "hydrus":
     cdef cppclass Client:
         void send(const char * buf, size_t n) nogil
         const char * remoteAddress() nogil

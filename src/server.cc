@@ -10,9 +10,14 @@
 // ----------------------------------------------
 #define HYDRUS_SERVER_BACKLOG 128
 
+#define _STREAM(p) ((uv_stream_t*)(p))
+#define _TCP(p) ((uv_tcp_t*)(p))
+#define _WSGI(p) ((hydrus::WSGIApplication*)(p->data))
+
 static uv_loop_t    *s_loop     = nullptr;
 static uv_tcp_t      s_http_server;
 static sockaddr_in   s_ipaddr;
+
 
 // ----------------------------------------------
 //  HTTP Server here
@@ -20,20 +25,16 @@ static sockaddr_in   s_ipaddr;
 static void
 http_on_allocate(uv_handle_t * handle, size_t suggest, uv_buf_t * buf)
 {
-}
-
-
-static void
-http_on_close(uv_handle_t * handle)
-{
-    free(handle);
+    buf->base = (char*)malloc(suggest);
+    buf->len = suggest;
 }
 
 
 static void
 http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
-    hydrus::WSGIApplication *wsgi = (hydrus::WSGIApplication*)stream->data;
+    // NOTICE: WSGI object will be deleted after it write (execute / raise)
+    auto wsgi = _WSGI(stream);
 
     if (nread == UV_EOF || nread < (ssize_t)buf->len)
     {
@@ -41,37 +42,31 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
             wsgi->execute();
         else
             wsgi->raise(400);
-
-        delete wsgi;
     }
     else if (nread < 0)
     {
         wsgi->raise(400);
         delete wsgi;
     }
-    wsgi->append(buf->base, nread);
+    else
+        wsgi->append(buf->base, nread);
 }
 
 
 static void
 http_on_connection(uv_stream_t *server, int status)
 {
-    if (status != 0) 
+    if (status != 0)
         return;
 
-    uv_tcp_t * client = new uv_tcp_t;
-    uv_tcp_init(s_loop, client);
-
-    if (uv_accept((uv_stream_t*)&s_http_server, (uv_stream_t*)client) < 0)
+    hydrus::WSGIApplication * app = new hydrus::WSGIApplication();
+    if (uv_accept((uv_stream_t*)&s_http_server, _STREAM(app->client())) < 0)
     {
-        uv_close((uv_handle_t*)client, http_on_close);
+        delete app;
     }
     else
     {
-        hydrus::WSGIApplication *wsgi = new hydrus::WSGIApplication((hydrus::WSGIClient)client);
-        client->data = (void*)wsgi;
-
-        uv_read_start((uv_stream_t*)client, http_on_allocate, http_on_read);
+        uv_read_start((uv_stream_t*)app->client(), http_on_allocate, http_on_read);
     }
 }
 
@@ -95,7 +90,7 @@ Server::listen(const char * address, int port)
     uv_ip4_addr(address, port, &s_ipaddr);
 
     err = uv_tcp_bind(&s_http_server, (sockaddr*)&s_ipaddr, 0);
-    if (err)    
+    if (err)
     {
         return hydrus::Server::INUSED;
     }
@@ -107,7 +102,7 @@ SERVER_READY:
 
 
 void
-Server::run()   
+Server::run()
 {
     uv_run(s_loop, UV_RUN_DEFAULT);
 }

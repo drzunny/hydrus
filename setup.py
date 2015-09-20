@@ -23,7 +23,7 @@ else:
                           '-Wall', '-Wextra', '-Wno-unused-parameter','-Wno-missing-field-initializers', '-O2']
 
 # Source files
-HYDRUS_SRC_FILES = glob.glob('hydrus/*.cc') + glob.glob('hydrus/*.c') + ['hydrus/_hydrus.pyx']
+HYDRUS_SRC_FILES = glob.glob('src/*.cc') + glob.glob('src/*.c') + ['hydrus/*.pyx']
 # Define Macros
 HYDRUS_MACROS = []
 
@@ -31,7 +31,7 @@ HYDRUS_MACROS = []
 #  Helpers
 # ---------------------------------------------
 def get_version():
-    hydrus_file = os.path.abspath(os.path.dirname(__file__)) + '/hydrus/_hydrus.pyx'
+    hydrus_file = os.path.abspath(os.path.dirname(__file__)) + '/hydrus/hydrus.pyx'
     ver = '0.1.0'
     with open(hydrus_file, 'r') as f:
         text = f.read()
@@ -56,7 +56,7 @@ setup(
     url='',
     ext_modules=cythonize([
         Extension(
-            'hydrus._hydrus', HYDRUS_SRC_FILES,
+            'hydrus.hydrus', HYDRUS_SRC_FILES,
             include_dirs=HYDRUS_INCLUDES,
             library_dirs=HYDRUS_LIBPATH,
             language='c++',

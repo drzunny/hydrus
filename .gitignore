@@ -13,3 +13,4 @@ msvc-build/Release
 /build
 /dist
 /hydrus.egg-info
+/hydrus/hydrus.cpp
