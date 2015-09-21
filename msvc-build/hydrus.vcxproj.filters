@@ -53,5 +53,8 @@
     <ClInclude Include="..\src\wsgi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\base\types.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

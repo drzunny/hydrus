@@ -21,6 +21,7 @@
     <ClInclude Include="..\src\base\definition.hpp" />
     <ClInclude Include="..\src\base\memory.h" />
     <ClInclude Include="..\src\base\nocopy.hpp" />
+    <ClInclude Include="..\src\base\types.hpp" />
     <ClInclude Include="..\src\http_parser.h" />
     <ClInclude Include="..\src\hy_core.h" />
     <ClInclude Include="..\src\server.h" />
@@ -72,7 +73,7 @@
       <WarningLevel>EnableAllWarnings</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>SSE_ENABLED;WIN32;_DEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>
@@ -92,7 +93,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>SSE_ENABLED;WIN32;NDEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>

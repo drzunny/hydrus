@@ -15,7 +15,9 @@ namespace hydrus
             READY      = 1,
             RUNNING    = 2,
         };
-
+        
+        const char * host();
+        int          port();
         ServerStatus listen(const char * address, int port);
         void run();
     };

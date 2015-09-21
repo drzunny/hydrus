@@ -4,7 +4,6 @@
 #include <uv.h>
 #include <memory.h>
 
-
 // ----------------------------------------------
 //  UV Variants
 // ----------------------------------------------
@@ -17,6 +16,8 @@
 static uv_loop_t    *s_loop     = nullptr;
 static uv_tcp_t      s_http_server;
 static sockaddr_in   s_ipaddr;
+static const char   *s_bind_address = nullptr;
+static int           s_bind_port = 0;
 
 
 // ----------------------------------------------
@@ -35,21 +36,30 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
     // NOTICE: WSGI object will be deleted after it write (execute / raise)
     auto wsgi = _WSGI(stream);
-
     if (nread == UV_EOF || nread < (ssize_t)buf->len)
     {
-        if (wsgi->parse())
+        if (nread > 0)  {
+            wsgi->append(buf->base, nread);
+        }
+
+        if (wsgi->parse())  
+        {
             wsgi->execute();
+        }
         else
-            wsgi->raise(400);
+        {
+            wsgi->raiseUp(400);
+        }
+        delete wsgi;
     }
     else if (nread < 0)
     {
-        wsgi->raise(400);
+        wsgi->raiseUp(400);
         delete wsgi;
     }
-    else
+    else {
         wsgi->append(buf->base, nread);
+    }
 }
 
 
@@ -97,6 +107,8 @@ Server::listen(const char * address, int port)
     uv_listen((uv_stream_t*)&s_http_server, HYDRUS_SERVER_BACKLOG, http_on_connection);
 
 SERVER_READY:
+    s_bind_address = address;
+    s_bind_port = port;
     return hydrus::Server::READY;
 }
 
@@ -106,5 +118,20 @@ Server::run()
 {
     uv_run(s_loop, UV_RUN_DEFAULT);
 }
+
+
+const char *
+Server::host()
+{
+    return s_bind_address;
+}
+
+
+int
+Server::port()
+{
+    return s_bind_port;
+}
+
 
 NS_END    // }

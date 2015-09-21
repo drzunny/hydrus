@@ -1,16 +1,11 @@
 #ifndef HYDRUS_CORE_H
 #define HYDRUS_CORE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "base/types.hpp"
+#include "wsgi.h"
 
-void hydrus_setup();
+void hydrus_setup(hydrus::WSGICallback callback);
 int  hydrus_listen(const char * address, int port);
 void hydrus_run();
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

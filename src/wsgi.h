@@ -1,50 +1,52 @@
 #ifndef HYDRUS_WSGI_H
 #define HYDRUS_WSGI_H
 
+#include <vector>
+#include <cstdint>
 #include "base/nocopy.hpp"
+#include "base/types.hpp"
 
 namespace hydrus
 {
-    // Data structure
-    struct RefBuf
-    {
-        const char * buf;
-        size_t length;
-    };
-
     // Declare the core WSGI Application
     struct WSGIClient;
+    struct WSGIHeader
+    {
+        RefBuf name;
+        RefBuf value;
+    };
+
     class WSGIApplication : DISALLOW_COPY
     {
     public:
         WSGIApplication();
-        ~WSGIApplication() {}
+        ~WSGIApplication();
 
+        void    send(const char * data, size_t sz);
         void    append(const char * buf, size_t nread);
         bool    parse();
         void    execute();
-        void    raise(int statusCode);
+        void    raiseUp(int statusCode);
         void *  client();
 
         // Properties
         // ---------------------------------
 
-        /* WSGI */
-        const char * WSGI_URL_SCHEME;
-
         /* HTTP */
-        const char * SERVER_SOFTWARE;
-        const char * SERVER_NAME;
-        const char * SERVER_PORT;
-        const char * SERVER_PROTOCOL;
-        const char * REQUEST_METHOD;
-        const char * PATH_INFO;
-        const char * QUERY_STRING;
-        const char * CONTENT_LENGTH;
-        const char * REMOTE_ADDR;
+        const char *            SERVER_SOFTWARE;
+        const char *            SERVER_NAME;
+        int                     SERVER_PORT;
+        const char *            SERVER_PROTOCOL;
+        const char *            REQUEST_METHOD;
+        uint64_t                CONTENT_LENGTH;
+        const char *            REMOTE_ADDR;
+        RefBuf                  URL;
+        RefBuf                  BODY;
+        std::vector<WSGIHeader> HEADERS;
 
     private:
-        WSGIClient*      client_;
+        WSGIClient*         client_;
+        Buffer<4096>        buffer_;
     };
 
     // Declare the WSGI Callback

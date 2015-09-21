@@ -1,109 +1,136 @@
 # -*- coding:utf8 -*-
 import sys
 
+from cStringIO import StringIO
+
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
 from cython.operator cimport dereference as iter_decr
 from cython.operator cimport preincrement as iter_inc
+from cpython cimport PyString_FromStringAndSize, Py_DECREF
 
 __VERSION__ = '0.1.0'
-
-CONST_HYDRUS_ERROR_RESPONSE = {
-    400: "HTTP/1.1 400 Bad Request\r\n\r\n",
-    500: "HTTP/1.1 500 Internal Server Error\r\n\r\n",
-    404: "HTTP/1.1 404 Not Found\r\n\r\n"
-}
 
 # ----------------------------------------------
 #  C++ definitions
 # ----------------------------------------------
-cdef extern from "../src/request.h" namespace "hydrus":
-    cdef cppclass Headers:
-        string name
-        string value
-
-    cdef cppclass Request:
-        string url
-        string method
-        size_t status_code
-        vector[Headers] headers
-        char * body
-        bint keepalive
+cdef extern from "../src/base/types.hpp" namespace "hydrus":
+    cdef struct RefBuf:
+        const char * buf
+        size_t       n
 
 
-
-cdef extern from "../src/server.h" namespace "hydrus":
-    cdef cppclass Client:
-        void send(const char * buf, size_t n) nogil
-        const char * remoteAddress() nogil
-
-    ctypedef void (*WSGICallback)(const Client&, const Request&)
-
-    cdef cppclass Server:
-        Server(WSGICallback) nogil
-        void listen(const char*, int) nogil
-        void run()
+cdef extern from "../src/wsgi.h" namespace "hydrus":
+    cdef struct WSGIHeader:
+        RefBuf name
+        RefBuf value
 
 
-# Global Instance
-cdef Server* G_hy_server = NULL
-G_hy_app = None
+    cdef cppclass WSGIApplication:
+        void send(const char * buffer, size_t n)
+        void raiseUp(int code)
+
+        const char * SERVER_SOFTWARE
+        const char * SERVER_NAME
+        const char * SERVER_PROTOCOL
+        const char * REQUEST_METHOD
+        const char * REMOTE_ADDR
+        size_t CONTENT_LENGTH
+        int SERVER_PORT
+        RefBuf URL
+        RefBuf BODY
+        vector[WSGIHeader] HEADERS
+
+
+    ctypedef void(*WSGICallback)(WSGIApplication&)
+
+
+cdef extern from "../src/hy_core.h":
+    void hydrus_setup(WSGICallback callback)
+    int hydrus_listen(const char * address, int port)
+    void hydrus_run()
+
 
 # ----------------------------------------------
 #  Hydrus Server Wrapper
 # ----------------------------------------------
+G_hy_app = None
+
+cdef class HydrusFileWrapper:
+    pass
+
+
 cdef class _HydrusResponse:
     cdef const char* status
-    cdef const Client* client
-    cdef str response_header
+    cdef WSGIApplication* wsgi
+    cdef basestring response_header
+    cdef basestring data
     cdef list headers
+    cdef dict env
 
     def __init__(self):
+        self.wsgi = NULL
         self.status = NULL
-        self.client = NULL
         self.response_header = ''
+        self.data = ''
         self.headers = []
+        self.env = {}
 
-    cdef void raise_error(self, const Client& client, int code):
-        if code in CONST_HYDRUS_ERROR_RESPONSE:
-            message = CONST_HYDRUS_ERROR_RESPONSE[code]
-            client.send(message, len(message))
-        else:
-            client.send('\r\n', 2)
+    cdef void raise_error(self, int code):
+        self.wsgi.raiseUp(code)
 
-    cdef to_environ(self, const Client& client, const Request & request):
-        environ = {'SERVER': 'hydrus %s' % __VERSION__}
+    cdef dict environ(self):
+        env = {'SERVER_SOFTWARE': 'hydrus %s' % __VERSION__}
 
-        environ['PATH_INFO'] = request.url.c_str()
-        environ['REQUEST_METHOD'] = request.method.c_str()
-        environ['KEEPALIVE'] = not (not request.keepalive)
-        environ['REMOTE_ADDR'] = client.remoteAddress()
-        environ['PATH_INFO'] = request.url.c_str()
+        cdef bytes url = PyString_FromStringAndSize(self.wsgi.URL.buf, self.wsgi.URL.n)
+        cdef bytes body = PyString_FromStringAndSize(self.wsgi.URL.buf, self.wsgi.URL.n)
+
+        cdef int queryPos = url.find('?')
+        cdef bytes qs = b'' if queryPos < 0 else url[queryPos+1:]
+        cdef bytes path = url if queryPos < 0 else url[:queryPos]
+
+        env['SERVER_NAME'] = self.wsgi.SERVER_NAME
+        env['SERVER_PORT'] = self.wsgi.SERVER_PORT
+        env['SERVER_PROTOCOL'] = 'HTTP/1.1'
+        env['REQUEST_METHOD'] = self.wsgi.REQUEST_METHOD
+        env['REMOTE_ADDR'] = self.wsgi.REMOTE_ADDR
+        env['PATH_INFO'] = url
+        env['QUERY_STRING'] = qs
 
         # WSGI parameters
-        environ['wsgi.errors'] = sys.stderr
-        environ['wsgi.file_wrapper'] = None
-        environ['SCRIPT_NAME'] = ''
-        environ['wsgi.version'] = (0, 1, 0)
-        environ['wsgi.multithread'] = False
-        environ['wsgi.multiprocess'] = True
-        environ['wsgi.run_once'] = False
-        environ['wsgi.url_scheme'] = 'http'
+        env['wsgi.errors'] = sys.stderr
+        env['wsgi.input'] = StringIO(body)
+        env['wsgi.file_wrapper'] = None
+        env['SCRIPT_NAME'] = ''
+        env['wsgi.version'] = (0, 1, 0)
+        env['wsgi.multithread'] = False
+        env['wsgi.multiprocess'] = True
+        env['wsgi.run_once'] = False
+        env['wsgi.url_scheme'] = 'http'
 
-        cdef int n = request.headers.size()
-        for _i in range(n):
-            environ[request.headers[_i].name.c_str()] = request.headers[_i].value.c_str()
-        return environ
+        Py_DECREF(url)
+        Py_DECREF(body)
 
-    cdef write(self, data):
+        cdef int n = self.wsgi.HEADERS.size()
+        for i in range(n):
+            name = PyString_FromStringAndSize(self.wsgi.HEADERS[i].name.buf, self.wsgi.HEADERS[i].name.n)
+            value = PyString_FromStringAndSize(self.wsgi.HEADERS[i].value.buf, self.wsgi.HEADERS[i].value.n)
+            env[name] = value
+            Py_DECREF(name)
+            Py_DECREF(value)
+        self.env = env
+        print(env)
+        return env
+
+    def write(self, bytes data):
         if not self.response_header:
             for name, val in self.headers:
-                self.response_header += '%s: %s\r\n' % (name, val)
-            self.client.send(self.response_header, len(self.response_header))
-
+                self.response_header += '%s:%s\r\n' % (name, val)
+            self.wsgi.send(self.response_header, len(self.response_header))
         if data:
-            self.client.send(data, len(data))
+            self.wsgi.send(data, len(data))
+
 
     def start_response(self, const char * status, headers, exec_info=None):
         if exec_info:
@@ -112,46 +139,49 @@ cdef class _HydrusResponse:
                     raise exec_info[0], exec_info[1], exec_info[2]
             except:
                 exec_info = None
-
         self.status = status
-        prefix = 'HTTP/1.1 %s\r\n' % status
-        self.client.send(prefix, len(prefix))
+        self.data = 'HTTP/1.1 %s\r\n' % status
         self.headers = headers
         self.write('\r\n')
 
 
-cdef void _hydrus_response_callback(const Client& client, const Request& req):
+cdef void _hydrus_response_callback(WSGIApplication & wsgi):
+    print('callback here')
     response = _HydrusResponse()
-    response.client = &client
-    environ = response.to_environ(client, req)
+    print('callback here2')
+    response.wsgi = &wsgi
+    environ = response.environ()
+    print('callback here3')
 
     try:
         retval = G_hy_app(environ, response.start_response)
+        print('callback here4')
         if not response.response_header:
-            response.raise_error(client, 400)
+            print('callback here5.0')
+            response.raise_error(400)
+            print('callback here5.1')
         else:
+            print('callback here6.0')
             for rs in retval:
-                client.send(rs, len(rs))
+                wsgi.send(rs, len(rs))
+            print('callback here6.1')
     except:
         import traceback
         traceback.print_exc()
-        response.raise_error(client, 500)
+        response.raise_error(500)
 
 
 # ----------------------------------------------
 #  Main API of hydrus
 # ----------------------------------------------
 def listen(app, const char* addr, int port):
-    global G_hy_server, G_hy_app
-    if G_hy_server is not NULL:
+    global G_hy_app
+    if G_hy_app is not None:
         return
-    G_hy_server = new Server(_hydrus_response_callback)
     G_hy_app = app
-    G_hy_server.listen(addr, port)
+    hydrus_setup(_hydrus_response_callback)
+    hydrus_listen(addr, port)
 
 
-def run(app=None, host=None, port=None):
-    if G_hy_server is NULL:
-        assert host is not None and port is not None, 'Cannot initialize hydrus server'
-        listen(app, host, port)
-    G_hy_server.run()
+def run():
+    hydrus_run()
