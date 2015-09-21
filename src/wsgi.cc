@@ -195,14 +195,14 @@ WSGIApplication::~WSGIApplication()
 void
 WSGIApplication::append(const char * buffer, size_t nread)
 {
-    buffer_.append(buffer, nread);
+    rbuffer_.append(buffer, nread);
 }
 
 
 bool
 WSGIApplication::parse()
 {
-    return http_parser_execute(&client_->parser, &s_parser_settings, buffer_.data(), buffer_.length()) == 0;
+    return http_parser_execute(&client_->parser, &s_parser_settings, rbuffer_.data(), rbuffer_.length()) == 0;
 }
 
 
@@ -246,7 +246,10 @@ WSGIApplication::send(const char * data, size_t sz)
     uv_write_t * w = new uv_write_t;
     w->data = this;
 
-    uv_buf_t buf = uv_buf_init(const_cast<char*>(data), sz);
+    wbuffer_.clear();
+    wbuffer_.append(data, sz);
+
+    uv_buf_t buf = uv_buf_init(wbuffer_.data(), sz);
     uv_write(w, (uv_stream_t*)this->client(), &buf, 1, http_on_write);
 }
 

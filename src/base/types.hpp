@@ -51,7 +51,7 @@ namespace hydrus
             total_ += n;
         }
 
-        const char * data() { return total_ <= SIZE ? sbuf_ : lbuf_.data(); }   
+        char * data() { return total_ <= SIZE ? sbuf_ : &lbuf_.at(0); }   
         size_t length() const { return total_; }
     };
 }

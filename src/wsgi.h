@@ -36,7 +36,6 @@ namespace hydrus
         const char *            SERVER_SOFTWARE;
         const char *            SERVER_NAME;
         int                     SERVER_PORT;
-        const char *            SERVER_PROTOCOL;
         const char *            REQUEST_METHOD;
         uint64_t                CONTENT_LENGTH;
         const char *            REMOTE_ADDR;
@@ -46,7 +45,8 @@ namespace hydrus
 
     private:
         WSGIClient*         client_;
-        Buffer<4096>        buffer_;
+        Buffer<4096>        rbuffer_;
+        Buffer<4096>        wbuffer_;
     };
 
     // Declare the WSGI Callback
