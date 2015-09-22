@@ -8,38 +8,31 @@ from libcpp.vector cimport vector
 
 from cython.operator cimport dereference as iter_decr
 from cython.operator cimport preincrement as iter_inc
-from cpython cimport PyString_FromStringAndSize, Py_DECREF
 
 __VERSION__ = '0.1.0'
 
 # ----------------------------------------------
 #  C++ definitions
 # ----------------------------------------------
-cdef extern from "../src/base/types.hpp" namespace "hydrus":
-    cdef struct RefBuf:
-        const char * buf
-        size_t       n
-
-
 cdef extern from "../src/wsgi.h" namespace "hydrus":
     cdef struct WSGIHeader:
-        RefBuf name
-        RefBuf value
+        string name
+        string value
 
 
     cdef cppclass WSGIApplication:
         void send(const char * buffer, size_t n)
         void raiseUp(int code)
 
-        const char * SERVER_SOFTWARE
-        const char * SERVER_NAME
-        const char * SERVER_PROTOCOL
-        const char * REQUEST_METHOD
-        const char * REMOTE_ADDR
+        string SERVER_SOFTWARE
+        string SERVER_NAME
+        string SERVER_PROTOCOL
+        string REQUEST_METHOD
+        string REMOTE_ADDR
         size_t CONTENT_LENGTH
         int SERVER_PORT
-        RefBuf URL
-        RefBuf BODY
+        string URL
+        string BODY
         vector[WSGIHeader] HEADERS
 
 
@@ -62,18 +55,16 @@ cdef class HydrusFileWrapper:
 
 
 cdef class _HydrusResponse:
-    cdef const char* status
+    cdef str status
     cdef WSGIApplication* wsgi
-    cdef basestring response_header
-    cdef basestring data
+    cdef basestring response_content
     cdef list headers
     cdef dict env
 
     def __init__(self):
         self.wsgi = NULL
-        self.status = NULL
-        self.response_header = ''
-        self.data = ''
+        self.status = None
+        self.response_content = ''
         self.headers = []
         self.env = {}
 
@@ -83,24 +74,56 @@ cdef class _HydrusResponse:
     cdef dict environ(self):
         env = {'SERVER_SOFTWARE': 'hydrus %s' % __VERSION__}
 
-        cdef bytes url = PyString_FromStringAndSize(self.wsgi.URL.buf, self.wsgi.URL.n)
-        cdef bytes body = PyString_FromStringAndSize(self.wsgi.URL.buf, self.wsgi.URL.n)
+        print('From string and size')
+        print('a1')
+        cdef bytes url = <bytes>self.wsgi.URL
+        print('a2')
+        cdef bytes body = <bytes>self.wsgi.BODY
+        print('a3')
+        cdef bytes server_name = <bytes>self.wsgi.SERVER_NAME
+        print('a4')
+        cdef int server_port = self.wsgi.SERVER_PORT
+        print('a5')
+        cdef bytes request_method = <bytes>self.wsgi.REQUEST_METHOD
+        print('a6')
+        cdef bytes remote_addr = <bytes>self.wsgi.REMOTE_ADDR
+        print('From end')
 
+        print ('Find QS')
         cdef int queryPos = url.find('?')
         cdef bytes qs = b'' if queryPos < 0 else url[queryPos+1:]
         cdef bytes path = url if queryPos < 0 else url[:queryPos]
+        print ('Find end')
 
-        env['SERVER_NAME'] = self.wsgi.SERVER_NAME
-        env['SERVER_PORT'] = self.wsgi.SERVER_PORT
+        i = 0
+        print('step_%d', i)
+        i += 1
+        env['SERVER_NAME'] = server_name
+        print('step_%d', i)
+        i += 1
+        env['SERVER_PORT'] = server_port
+        print('step_%d', i)
+        i += 1
         env['SERVER_PROTOCOL'] = 'HTTP/1.1'
-        env['REQUEST_METHOD'] = self.wsgi.REQUEST_METHOD
-        env['REMOTE_ADDR'] = self.wsgi.REMOTE_ADDR
-        env['PATH_INFO'] = url
-        env['QUERY_STRING'] = qs
+        print('step_%d', i)
+        i += 1
+        env['REQUEST_METHOD'] = request_method
+        print('step_%d', i)
+        i += 1
+        env['REMOTE_ADDR'] = remote_addr
+        print('step_%d', i)
+        i += 1
+        # env['PATH_INFO'] = path
+        # env['QUERY_STRING'] = qs
+
+        print('Set first end')
 
         # WSGI parameters
         env['wsgi.errors'] = sys.stderr
         env['wsgi.input'] = StringIO(body)
+
+        print('body end')
+
         env['wsgi.file_wrapper'] = None
         env['SCRIPT_NAME'] = ''
         env['wsgi.version'] = (0, 1, 0)
@@ -109,40 +132,35 @@ cdef class _HydrusResponse:
         env['wsgi.run_once'] = False
         env['wsgi.url_scheme'] = 'http'
 
-        Py_DECREF(url)
-        Py_DECREF(body)
-
         cdef int n = self.wsgi.HEADERS.size()
         for i in range(n):
-            name = PyString_FromStringAndSize(self.wsgi.HEADERS[i].name.buf, self.wsgi.HEADERS[i].name.n)
-            value = PyString_FromStringAndSize(self.wsgi.HEADERS[i].value.buf, self.wsgi.HEADERS[i].value.n)
+            name = self.wsgi.HEADERS[i].name.c_str()
+            value = self.wsgi.HEADERS[i].value.c_str()
             env[name] = value
-            Py_DECREF(name)
-            Py_DECREF(value)
         self.env = env
         print(env)
         return env
 
     def write(self, bytes data):
-        if not self.response_header:
+        if not self.response_content:
             for name, val in self.headers:
-                self.response_header += '%s:%s\r\n' % (name, val)
-            self.wsgi.send(self.response_header, len(self.response_header))
+                self.response_content += '%s:%s\r\n' % (name, val)
+            header = '%s%s' % (self.status, self.response_content)
+            self.wsgi.send(header, len(header))
         if data:
-            self.wsgi.send(data, len(data))
+             self.wsgi.send(data, len(data))
 
 
     def start_response(self, const char * status, headers, exec_info=None):
         if exec_info:
             try:
-                if self.response_header:
+                if self.response_content:
                     raise exec_info[0], exec_info[1], exec_info[2]
             except:
                 exec_info = None
-        self.status = status
-        self.data = 'HTTP/1.1 %s\r\n' % status
+        self.status = 'HTTP/1.1 %s\r\n' % status
         self.headers = headers
-        self.write('\r\n')
+        self.write(b'\r\n')
 
 
 cdef void _hydrus_response_callback(WSGIApplication & wsgi):
@@ -156,7 +174,7 @@ cdef void _hydrus_response_callback(WSGIApplication & wsgi):
     try:
         retval = G_hy_app(environ, response.start_response)
         print('callback here4')
-        if not response.response_header:
+        if not response.response_content:
             print('callback here5.0')
             response.raise_error(400)
             print('callback here5.1')

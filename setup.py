@@ -15,7 +15,7 @@ if platform.system() == 'Windows':
     HYDRUS_INCLUDES = ['3rd/prebuilt/include']
     HYDRUS_LIBRARIES = ['libuv', 'ws2_32', 'IPHLPAPI', 'Psapi', 'Userenv', 'advapi32']
     HYDRUS_LIBPATH = ['3rd/prebuilt/libs']
-    HYDRUS_BUILD_FLAGS = ['/MT']
+    HYDRUS_BUILD_FLAGS = []
 else:
     HYDRUS_INCLUDES = []
     HYDRUS_LIBRARIES = ['uv']
@@ -47,7 +47,7 @@ def get_version():
 # ---------------------------------------------
 setup(
     name='hydrus',
-    package=['hydrus'],
+    packages=['hydrus'],
     version=get_version(),
     license='BSD License',
     description='A lightweight and fast enough WSGI Server for Python',
@@ -62,7 +62,7 @@ setup(
             language='c++',
             libraries=HYDRUS_LIBRARIES,
             extra_compile_args=HYDRUS_BUILD_FLAGS,
-            define_macros=HYDRUS_MACROS
+            define_macros=HYDRUS_MACROS,
         )
-    ])
+    ], gdb_debug=True)
 )

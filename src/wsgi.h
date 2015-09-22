@@ -1,10 +1,10 @@
 #ifndef HYDRUS_WSGI_H
 #define HYDRUS_WSGI_H
 
+#include <string>
 #include <vector>
 #include <cstdint>
 #include "base/nocopy.hpp"
-#include "base/types.hpp"
 
 namespace hydrus
 {
@@ -12,13 +12,14 @@ namespace hydrus
     struct WSGIClient;
     struct WSGIHeader
     {
-        RefBuf name;
-        RefBuf value;
+        std::string name;
+        std::string value;
     };
 
     class WSGIApplication : DISALLOW_COPY
     {
     public:
+        typedef std::string Str;
         WSGIApplication();
         ~WSGIApplication();
 
@@ -33,20 +34,19 @@ namespace hydrus
         // ---------------------------------
 
         /* HTTP */
-        const char *            SERVER_SOFTWARE;
-        const char *            SERVER_NAME;
+        Str                     SERVER_SOFTWARE;
+        Str                     SERVER_NAME;
         int                     SERVER_PORT;
-        const char *            REQUEST_METHOD;
+        Str                     REQUEST_METHOD;
         uint64_t                CONTENT_LENGTH;
-        const char *            REMOTE_ADDR;
-        RefBuf                  URL;
-        RefBuf                  BODY;
+        Str                     REMOTE_ADDR;
+        Str                     URL;
+        Str                     BODY;
         std::vector<WSGIHeader> HEADERS;
 
     private:
         WSGIClient*         client_;
-        Buffer<4096>        rbuffer_;
-        Buffer<4096>        wbuffer_;
+        Str                 rbuffer_;
     };
 
     // Declare the WSGI Callback

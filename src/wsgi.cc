@@ -6,6 +6,8 @@
 #include "http_parser.h"
 
 #include <cassert>
+#include <iostream>
+using namespace std;
 
 #define _WSGI(p) ((hydrus::WSGIApplication*)(p->data))
 #define _CLIENT(p) ((hydrus::WSGIClient*)(p->client()))
@@ -26,18 +28,18 @@ static const char kWSGIStatus_500[] = { "HTTP/1.1 500 Internal Server Error\r\n\
 static hydrus::WSGICallback s_wsgi_callback = nullptr;
 static http_parser_settings s_parser_settings;
 
-static const char * kHydrusServerName       = "hydrus";
+static const char * kHydrusServerName = "hydrus";
 
 
 struct hydrus::WSGIClient
 {
-    uv_tcp_t        tcp;
+    uv_tcp_t*       tcp;
     http_parser     parser;
     bool            openning;
-    RefBuf          tName;
-    RefBuf          tValue;
+    std::string     tName;
+    std::string     tValue;
 
-    WSGIClient() :openning(false) {}
+    WSGIClient() :openning(false), tcp(new uv_tcp_t) {}
 };
 
 
@@ -45,19 +47,19 @@ struct hydrus::WSGIClient
 //  UV callbacks
 // -----------------------------------
 
-// static void
-// http_on_close(uv_handle_t * handle)
-// {
-//    auto wsgi = _WSGI(handle);
-//    delete wsgi;
-// }
-
-
 static void
 http_on_write(uv_write_t* req, int status)
 {
     free(req);
 }
+
+
+static void
+http_on_close(uv_handle_t * hnd)
+{
+    free(hnd);
+}
+
 
 
 // -----------------------------------
@@ -74,7 +76,7 @@ static int
 parser_on_url(http_parser* pa, const char *at, size_t length)
 {
     auto wsgi = _WSGI(pa);
-    wsgi->URL = { at, length };
+    wsgi->URL = string(at, length);
     return 0;
 }
 
@@ -83,7 +85,7 @@ static int
 parser_on_body(http_parser* pa, const char *at, size_t length)
 {
     auto wsgi = _WSGI(pa);
-    wsgi->BODY = { at, length };
+    wsgi->BODY = string(at, length);
     return 0;
 }
 
@@ -92,10 +94,9 @@ static int
 parser_on_header_field(http_parser* pa, const char *at, size_t length)
 {
     auto wsgi = _WSGI(pa);
-    auto client = _CLIENT(wsgi);
 
     client->openning = true;
-    client->tName = { at, length };
+    client->tName = string(at, length);
 
     return 0;
 }
@@ -110,9 +111,9 @@ parser_on_header_value(http_parser* pa, const char *at, size_t length)
     if (!client->openning)
         return 0;
 
-    client->tValue = { at, length };
+    client->tValue = string(at, length);
     client->openning = false;
-    
+
     wsgi->HEADERS.push_back({ client->tName, client->tValue });
     return 0;
 }
@@ -124,7 +125,7 @@ parser_on_header_complete(http_parser* pa)
     auto wsgi = _WSGI(pa);
     auto client = _CLIENT(wsgi);
 
-    if (client->openning) 
+    if (client->openning)
     {
         return -1;
     }
@@ -135,8 +136,16 @@ parser_on_header_complete(http_parser* pa)
 static int
 parser_on_complete(http_parser* pa)
 {
+    static char s_addr_buf[64];
     auto wsgi = _WSGI(pa);
+    auto client = _CLIENT(wsgi);
 
+    sockaddr_in ip;
+    int len;
+    uv_tcp_getpeername(client->tcp, (sockaddr*)&ip, &len);
+    uv_ip4_name(&ip, s_addr_buf, len);
+
+    wsgi->REMOTE_ADDR = s_addr_buf;
     wsgi->REQUEST_METHOD = http_method_str((http_method)pa->method);
     wsgi->CONTENT_LENGTH = pa->content_length;
 
@@ -168,17 +177,17 @@ WSGIReady(WSGICallback callback)
     s_parser_settings.on_message_complete = parser_on_complete;
 }
 
-WSGIApplication::WSGIApplication():    
-    client_(new WSGIClient),
-    SERVER_NAME(Server::host()),
-    SERVER_PORT(Server::port())
+WSGIApplication::WSGIApplication() :
+client_(new WSGIClient),
+SERVER_NAME(Server::host()),
+SERVER_PORT(Server::port())
 {
     // for headers
     HEADERS.reserve(16);
 
     // for libuv
-    client_->tcp.data = this;
-    uv_tcp_init(uv_default_loop(), &(client_->tcp));
+    client_->tcp->data = this;
+    uv_tcp_init(uv_default_loop(), client_->tcp);
 
     // for http_parser
     client_->parser.data = (void*)this;
@@ -188,7 +197,7 @@ WSGIApplication::WSGIApplication():
 
 WSGIApplication::~WSGIApplication()
 {
-    uv_close((uv_handle_t*)&client_->tcp, nullptr);
+    uv_close((uv_handle_t*)client_->tcp, http_on_close);
     delete client_;
 }
 
@@ -202,7 +211,9 @@ WSGIApplication::append(const char * buffer, size_t nread)
 bool
 WSGIApplication::parse()
 {
-    return http_parser_execute(&client_->parser, &s_parser_settings, rbuffer_.data(), rbuffer_.length()) == 0;
+    const char * data = rbuffer_.data();
+    size_t len = rbuffer_.length();
+    return http_parser_execute(&(client_->parser), &s_parser_settings, data, len) == 0;
 }
 
 
@@ -219,16 +230,17 @@ WSGIApplication::raiseUp(int statusCode)
     switch (statusCode)
     {
     case 400:
-        this->send(kWSGIStatus_400, sizeof(kWSGIStatus_400));
+        // with out `\0` in HTTPResponse buffer
+        this->send(kWSGIStatus_400, sizeof(kWSGIStatus_400) - 1);
         break;
     case 404:
-        this->send(kWSGIStatus_404, sizeof(kWSGIStatus_404));
+        this->send(kWSGIStatus_404, sizeof(kWSGIStatus_404) - 1);
         break;
     case 500:
-        this->send(kWSGIStatus_500, sizeof(kWSGIStatus_500));
+        this->send(kWSGIStatus_500, sizeof(kWSGIStatus_500) - 1);
         break;
     default:
-        this->send("\r\n\r\n", 5);
+        this->send("\r\n\r\n", 4);
         break;
     }
 }
@@ -236,21 +248,29 @@ WSGIApplication::raiseUp(int statusCode)
 void *
 WSGIApplication::client()
 {
-    return &(client_->tcp);
+    return client_->tcp;
 }
 
 
 void
 WSGIApplication::send(const char * data, size_t sz)
 {
+    static const size_t MAX_SEND = 1024 * 1024;
+    static char SENDING[MAX_SEND];
+
+    size_t send_size = sz > MAX_SEND ? MAX_SEND : sz;
+    size_t remain = sz - send_size;
+
     uv_write_t * w = new uv_write_t;
     w->data = this;
 
-    wbuffer_.clear();
-    wbuffer_.append(data, sz);
-
-    uv_buf_t buf = uv_buf_init(wbuffer_.data(), sz);
+    memcpy(SENDING, data, send_size);
+    uv_buf_t buf = uv_buf_init(SENDING, send_size);
     uv_write(w, (uv_stream_t*)this->client(), &buf, 1, http_on_write);
+    if (remain > 0)
+    {
+        this->send(data + send_size, remain);
+    }
 }
 
 

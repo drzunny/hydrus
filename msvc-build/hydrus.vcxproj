@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\hydrus\hydrus.cpp" />
     <ClCompile Include="..\src\base\memory.cc" />
     <ClCompile Include="..\src\http_parser.c" />
     <ClCompile Include="..\src\hy_core.cc" />
@@ -60,6 +61,7 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(SolutionDir)..\3rd\prebuilt\include;$(PYTHON_HOME)\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\3rd\prebuilt\libs;$(PYTHON_HOME)\libs;$(LibraryPath)</LibraryPath>
+    <TargetExt>.pyd</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -70,11 +72,11 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>SSE_ENABLED;WIN32;_DEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <TreatWarningAsError>true</TreatWarningAsError>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <TreatWarningAsError>false</TreatWarningAsError>
       <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -93,7 +95,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>SSE_ENABLED;WIN32;NDEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>

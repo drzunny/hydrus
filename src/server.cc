@@ -38,28 +38,35 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
     auto wsgi = _WSGI(stream);
     if (nread == UV_EOF || nread < (ssize_t)buf->len)
     {
+        printf("nread:%d, buf->len:%d\n", nread, buf->len);
+        printf("content:\n\n%s \n\n", buf->base);
         if (nread > 0)  {
             wsgi->append(buf->base, nread);
         }
 
+        printf("I parser it \n");
         if (wsgi->parse())  
         {
+            printf("parse OK\n");
             wsgi->execute();
         }
         else
         {
+            printf("Parse error\n");
             wsgi->raiseUp(400);
         }
-        delete wsgi;
+        //delete wsgi;
     }
     else if (nread < 0)
     {
         wsgi->raiseUp(400);
-        delete wsgi;
+        //delete wsgi;
     }
     else {
         wsgi->append(buf->base, nread);
+        uv_read_start(stream, http_on_allocate, http_on_read);
     }
+    free(buf->base);
 }
 
 

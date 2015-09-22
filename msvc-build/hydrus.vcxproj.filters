@@ -30,6 +30,9 @@
     <ClCompile Include="..\src\wsgi.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\hydrus\hydrus.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\http_parser.h">
