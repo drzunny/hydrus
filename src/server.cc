@@ -47,7 +47,9 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         else if (!wsgi->has_buffer())
         {
             printf("No buffer, bye bye:\n");
+
             delete wsgi;
+            free(buf->base);
             return;
         }
 
