@@ -14,3 +14,5 @@ msvc-build/Release
 /dist
 /hydrus.egg-info
 /hydrus/hydrus.cpp
+/cython_debug/cython_debug_info_hydrus.hydrus
+/cython_debug/interpreter

@@ -74,55 +74,56 @@ cdef class _HydrusResponse:
     cdef dict environ(self):
         env = {'SERVER_SOFTWARE': 'hydrus %s' % __VERSION__}
 
-        print('From string and size')
-        print('a1')
+        #print('From string and size')
+        #print('a1')
         cdef bytes url = <bytes>self.wsgi.URL
-        print('a2')
+        #print('a2')
         cdef bytes body = <bytes>self.wsgi.BODY
-        print('a3')
+        #print('a3')
         cdef bytes server_name = <bytes>self.wsgi.SERVER_NAME
-        print('a4')
+        #print('a4')
         cdef int server_port = self.wsgi.SERVER_PORT
-        print('a5')
+        #print('a5')
         cdef bytes request_method = <bytes>self.wsgi.REQUEST_METHOD
-        print('a6')
+        #print('a6')
         cdef bytes remote_addr = <bytes>self.wsgi.REMOTE_ADDR
-        print('From end')
+        #print('From end')
 
-        print ('Find QS')
+        #print ('Find QS')
         cdef int queryPos = url.find('?')
+        #print('queryPos = ', queryPos)
         cdef bytes qs = b'' if queryPos < 0 else url[queryPos+1:]
         cdef bytes path = url if queryPos < 0 else url[:queryPos]
-        print ('Find end')
+        #print ('Find end')
 
         i = 0
-        print('step_%d', i)
+        #print('step_%d', i)
         i += 1
         env['SERVER_NAME'] = server_name
-        print('step_%d', i)
+        #print('step_%d', i)
         i += 1
-        env['SERVER_PORT'] = server_port
-        print('step_%d', i)
+        env['SERVER_PORT'] = str(server_port)
+        #print('step_%d', i)
         i += 1
         env['SERVER_PROTOCOL'] = 'HTTP/1.1'
-        print('step_%d', i)
+        #print('step_%d', i)
         i += 1
         env['REQUEST_METHOD'] = request_method
-        print('step_%d', i)
+        #print('step_%d', i)
         i += 1
         env['REMOTE_ADDR'] = remote_addr
-        print('step_%d', i)
+        #print('step_%d', i)
         i += 1
-        # env['PATH_INFO'] = path
-        # env['QUERY_STRING'] = qs
+        env['PATH_INFO'] = path
+        env['QUERY_STRING'] = qs
 
-        print('Set first end')
+        #print('Set first end')
 
         # WSGI parameters
         env['wsgi.errors'] = sys.stderr
         env['wsgi.input'] = StringIO(body)
 
-        print('body end')
+        #print('body end')
 
         env['wsgi.file_wrapper'] = None
         env['SCRIPT_NAME'] = ''
@@ -138,7 +139,7 @@ cdef class _HydrusResponse:
             value = self.wsgi.HEADERS[i].value.c_str()
             env[name] = value
         self.env = env
-        print(env)
+        #print(env)
         return env
 
     def write(self, bytes data):
@@ -164,25 +165,25 @@ cdef class _HydrusResponse:
 
 
 cdef void _hydrus_response_callback(WSGIApplication & wsgi):
-    print('callback here')
+    #print('callback here')
     response = _HydrusResponse()
-    print('callback here2')
+    #print('callback here2')
     response.wsgi = &wsgi
     environ = response.environ()
-    print('callback here3')
+    #print('callback here3')
 
     try:
         retval = G_hy_app(environ, response.start_response)
-        print('callback here4')
+        #print('callback here4')
         if not response.response_content:
-            print('callback here5.0')
+            #print('callback here5.0')
             response.raise_error(400)
-            print('callback here5.1')
+            #print('callback here5.1')
         else:
-            print('callback here6.0')
+            #print('callback here6.0')
             for rs in retval:
                 wsgi.send(rs, len(rs))
-            print('callback here6.1')
+            #print('callback here6.1')
     except:
         import traceback
         traceback.print_exc()

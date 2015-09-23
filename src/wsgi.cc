@@ -5,12 +5,13 @@
 #include <uv.h>
 #include "http_parser.h"
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 using namespace std;
 
 #define _WSGI(p) ((hydrus::WSGIApplication*)(p->data))
-#define _CLIENT(p) ((hydrus::WSGIClient*)(p->client()))
+#define _CLIENT(p) ((p->client()))
 
 
 // ----------------------------------
@@ -68,6 +69,8 @@ http_on_close(uv_handle_t * hnd)
 static int
 parser_on_begin(http_parser * pa)
 {
+    //cout << "parser_on_begin" << endl;
+    //cout << "PA:CONTENT_LENGTH : " << pa->content_length << endl;
     return 0;
 }
 
@@ -75,6 +78,8 @@ parser_on_begin(http_parser * pa)
 static int
 parser_on_url(http_parser* pa, const char *at, size_t length)
 {
+    //cout << "parser_on_url" << endl;
+    //cout << "PA:CONTENT_LENGTH : " << pa->content_length << endl;
     auto wsgi = _WSGI(pa);
     wsgi->URL = string(at, length);
     return 0;
@@ -84,6 +89,8 @@ parser_on_url(http_parser* pa, const char *at, size_t length)
 static int
 parser_on_body(http_parser* pa, const char *at, size_t length)
 {
+    //cout << "parser_on_body" << endl;
+    //cout << "PA:CONTENT_LENGTH : " << pa->content_length << endl;
     auto wsgi = _WSGI(pa);
     wsgi->BODY = string(at, length);
     return 0;
@@ -93,7 +100,10 @@ parser_on_body(http_parser* pa, const char *at, size_t length)
 static int
 parser_on_header_field(http_parser* pa, const char *at, size_t length)
 {
+    //cout << "parser_on_field" << endl;
+    //cout << "PA:CONTENT_LENGTH : " << pa->content_length << endl;
     auto wsgi = _WSGI(pa);
+    auto client = _CLIENT(wsgi);
 
     client->openning = true;
     client->tName = string(at, length);
@@ -105,6 +115,8 @@ parser_on_header_field(http_parser* pa, const char *at, size_t length)
 static int
 parser_on_header_value(http_parser* pa, const char *at, size_t length)
 {
+    //cout << "parser_on_value" << endl;
+    //cout << "PA:CONTENT_LENGTH : " << pa->content_length << endl;
     auto wsgi = _WSGI(pa);
     auto client = _CLIENT(wsgi);
 
@@ -122,11 +134,13 @@ parser_on_header_value(http_parser* pa, const char *at, size_t length)
 static int
 parser_on_header_complete(http_parser* pa)
 {
+    //cout << "parser_on_header end" << endl;
+    //cout << "PA:CONTENT_LENGTH : " << pa->content_length << endl;
     auto wsgi = _WSGI(pa);
     auto client = _CLIENT(wsgi);
 
     if (client->openning)
-    {
+    {        
         return -1;
     }
     return 0;
@@ -136,6 +150,8 @@ parser_on_header_complete(http_parser* pa)
 static int
 parser_on_complete(http_parser* pa)
 {
+    //cout << "parser_on_complete" << endl;
+    //cout << "PA:CONTENT_LENGTH : " << pa->content_length << endl;
     static char s_addr_buf[64];
     auto wsgi = _WSGI(pa);
     auto client = _CLIENT(wsgi);
@@ -151,6 +167,7 @@ parser_on_complete(http_parser* pa)
 
     return 0;
 }
+
 
 
 // -----------------------------------
@@ -204,7 +221,7 @@ WSGIApplication::~WSGIApplication()
 void
 WSGIApplication::append(const char * buffer, size_t nread)
 {
-    rbuffer_.append(buffer, nread);
+    rbuffer_.insert(rbuffer_.end(), buffer, buffer + nread);
 }
 
 
@@ -212,8 +229,14 @@ bool
 WSGIApplication::parse()
 {
     const char * data = rbuffer_.data();
-    size_t len = rbuffer_.length();
-    return http_parser_execute(&(client_->parser), &s_parser_settings, data, len) == 0;
+    size_t len = rbuffer_.size();
+    //printf("Going to parse, %p(%d)\n%s\n", this, len, string(rbuffer_.data(), rbuffer_.size()));
+    if (len > 0)
+    {
+        size_t parsed = http_parser_execute(&(client_->parser), &s_parser_settings, data, len);
+        return parsed == len && client_->parser.http_errno == HPE_OK;
+    }
+    return false;
 }
 
 
@@ -246,9 +269,16 @@ WSGIApplication::raiseUp(int statusCode)
 }
 
 void *
-WSGIApplication::client()
+WSGIApplication::raw_client()
 {
     return client_->tcp;
+}
+
+
+WSGIClient*
+WSGIApplication::client()
+{
+    return client_;
 }
 
 
@@ -266,7 +296,7 @@ WSGIApplication::send(const char * data, size_t sz)
 
     memcpy(SENDING, data, send_size);
     uv_buf_t buf = uv_buf_init(SENDING, send_size);
-    uv_write(w, (uv_stream_t*)this->client(), &buf, 1, http_on_write);
+    uv_write(w, (uv_stream_t*)this->raw_client(), &buf, 1, http_on_write);
     if (remain > 0)
     {
         this->send(data + send_size, remain);

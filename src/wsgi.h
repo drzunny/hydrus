@@ -28,7 +28,10 @@ namespace hydrus
         bool    parse();
         void    execute();
         void    raiseUp(int statusCode);
-        void *  client();
+        WSGIClient * client();
+        void *  raw_client();
+
+        inline bool    has_buffer() const { return !rbuffer_.empty(); }
 
         // Properties
         // ---------------------------------
@@ -46,7 +49,7 @@ namespace hydrus
 
     private:
         WSGIClient*         client_;
-        Str                 rbuffer_;
+        std::vector<char>   rbuffer_;
     };
 
     // Declare the WSGI Callback

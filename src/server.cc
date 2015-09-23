@@ -38,31 +38,39 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
     auto wsgi = _WSGI(stream);
     if (nread == UV_EOF || nread < (ssize_t)buf->len)
     {
-        printf("nread:%d, buf->len:%d\n", nread, buf->len);
-        printf("content:\n\n%s \n\n", buf->base);
-        if (nread > 0)  {
+        //printf("nread:%d, buf->len:%d\n", nread, buf->len);
+        if (nread > 0)  
+        {
+            //printf("content:\n\n%s \n\n", buf->base);
             wsgi->append(buf->base, nread);
         }
-
-        printf("I parser it \n");
-        if (wsgi->parse())  
+        else if (!wsgi->has_buffer())
         {
-            printf("parse OK\n");
+            printf("No buffer, bye bye:\n");
+            delete wsgi;
+            return;
+        }
+
+        //printf("I parser it \n");
+        if (wsgi->parse())
+        {
+            //printf("parse OK\n");
             wsgi->execute();
         }
         else
         {
-            printf("Parse error\n");
+            //printf("Parse error\n");
             wsgi->raiseUp(400);
         }
-        //delete wsgi;
+        delete wsgi;
     }
     else if (nread < 0)
     {
         wsgi->raiseUp(400);
-        //delete wsgi;
+        delete wsgi;
     }
-    else {
+    else 
+    {
         wsgi->append(buf->base, nread);
         uv_read_start(stream, http_on_allocate, http_on_read);
     }
@@ -73,17 +81,22 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 static void
 http_on_connection(uv_stream_t *server, int status)
 {
-    if (status != 0)
+    static int failCounter = 0;
+    if (status != 0) 
+    {
+        printf("Status Error, bye bye:%d\n", status);
         return;
+    }
 
     hydrus::WSGIApplication * app = new hydrus::WSGIApplication();
-    if (uv_accept((uv_stream_t*)&s_http_server, _STREAM(app->client())) < 0)
+    if (uv_accept((uv_stream_t*)&s_http_server, _STREAM(app->raw_client())) < 0)
     {
+        printf("Connect fail, bye bye:%d\n", ++failCounter);
         delete app;
     }
     else
     {
-        uv_read_start((uv_stream_t*)app->client(), http_on_allocate, http_on_read);
+        uv_read_start((uv_stream_t*)app->raw_client(), http_on_allocate, http_on_read);
     }
 }
 
