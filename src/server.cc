@@ -38,30 +38,23 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
     auto wsgi = _WSGI(stream);
     if (nread == UV_EOF || nread < (ssize_t)buf->len)
     {
-        //printf("nread:%d, buf->len:%d\n", nread, buf->len);
-        if (nread > 0)  
+        if (nread > 0)
         {
-            //printf("content:\n\n%s \n\n", buf->base);
             wsgi->append(buf->base, nread);
         }
         else if (!wsgi->has_buffer())
         {
-            printf("No buffer, bye bye:\n");
-
             delete wsgi;
             free(buf->base);
             return;
         }
 
-        //printf("I parser it \n");
         if (wsgi->parse())
         {
-            //printf("parse OK\n");
             wsgi->execute();
         }
         else
         {
-            //printf("Parse error\n");
             wsgi->raiseUp(400);
         }
         delete wsgi;
@@ -71,7 +64,7 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         wsgi->raiseUp(400);
         delete wsgi;
     }
-    else 
+    else
     {
         wsgi->append(buf->base, nread);
         uv_read_start(stream, http_on_allocate, http_on_read);
@@ -84,16 +77,12 @@ static void
 http_on_connection(uv_stream_t *server, int status)
 {
     static int failCounter = 0;
-    if (status != 0) 
-    {
-        printf("Status Error, bye bye:%d\n", status);
+    if (status != 0)
         return;
-    }
 
     hydrus::WSGIApplication * app = new hydrus::WSGIApplication();
     if (uv_accept((uv_stream_t*)&s_http_server, _STREAM(app->raw_client())) < 0)
     {
-        printf("Connect fail, bye bye:%d\n", ++failCounter);
         delete app;
     }
     else

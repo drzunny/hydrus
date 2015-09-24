@@ -19,11 +19,12 @@ if platform.system() == 'Windows':
 else:
     HYDRUS_INCLUDES = []
     HYDRUS_LIBRARIES = ['uv']
+    HYDRUS_LIBPATH = []
     HYDRUS_BUILD_FLAGS = ['-std=c++11','-fno-strict-aliasing', '-fcommon', '-fPIC',
                           '-Wall', '-Wextra', '-Wno-unused-parameter','-Wno-missing-field-initializers', '-O2']
 
 # Source files
-HYDRUS_SRC_FILES = glob.glob('src/*.cc') + glob.glob('src/*.c') + ['hydrus/*.pyx']
+HYDRUS_SRC_FILES = glob.glob('src/*.cc') + glob.glob('src/*.c') + glob.glob('hydrus/*.pyx')
 # Define Macros
 HYDRUS_MACROS = []
 
@@ -64,5 +65,5 @@ setup(
             extra_compile_args=HYDRUS_BUILD_FLAGS,
             define_macros=HYDRUS_MACROS,
         )
-    ], gdb_debug=True)
+    ])
 )
