@@ -12,7 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\hydrus\hydrus.cpp" />
-    <ClCompile Include="..\src\base\memory.cc" />
     <ClCompile Include="..\src\http_parser.c" />
     <ClCompile Include="..\src\hy_core.cc" />
     <ClCompile Include="..\src\server.cc" />
@@ -20,7 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\base\definition.hpp" />
-    <ClInclude Include="..\src\base\memory.h" />
+    <ClInclude Include="..\src\base\memory.hpp" />
     <ClInclude Include="..\src\base\nocopy.hpp" />
     <ClInclude Include="..\src\base\types.hpp" />
     <ClInclude Include="..\src\http_parser.h" />

@@ -1,6 +1,7 @@
 #include "wsgi.h"
 #include "server.h"
 #include "base/definition.hpp"
+#include "base/memory.hpp"
 
 #include <uv.h>
 #include "http_parser.h"
@@ -22,12 +23,14 @@ static const char kWSGIStatus_400[] = { "HTTP/1.1 400 Bad Request\r\n\r\n" };
 static const char kWSGIStatus_404[] = { "HTTP/1.1 404 Not Found\r\n\r\n" };
 static const char kWSGIStatus_500[] = { "HTTP/1.1 500 Internal Server Error\r\n\r\n" };
 
+static hydrus::FixedMemoryPool<1024*1024> sWriteBuffer;
+
 
 // -----------------------------------
 //  helper functions
 // -----------------------------------
-static hydrus::WSGICallback s_wsgi_callback = nullptr;
-static http_parser_settings s_parser_settings;
+static hydrus::WSGICallback sWSGIHandler = nullptr;
+static http_parser_settings sParserSetting;
 
 static const char * kHydrusServerName = "hydrus";
 
@@ -40,7 +43,10 @@ struct hydrus::WSGIClient
     std::string     tName;
     std::string     tValue;
 
-    WSGIClient() :openning(false), tcp(new uv_tcp_t) {}
+    WSGIClient() :openning(false), tcp(new uv_tcp_t) 
+    {
+        uv_tcp_init(uv_default_loop(), tcp);
+    }
 };
 
 
@@ -164,20 +170,20 @@ NS(hydrus)
 void
 WSGIReady(WSGICallback callback)
 {
-    if (s_wsgi_callback)
+    if (sWSGIHandler)
         return;
 
     // setup callback
-    s_wsgi_callback = callback;
+    sWSGIHandler = callback;
 
     // setup parser callback
-    s_parser_settings.on_message_begin = parser_on_begin;
-    s_parser_settings.on_url = parser_on_url;
-    s_parser_settings.on_body = parser_on_body;
-    s_parser_settings.on_header_field = parser_on_header_field;
-    s_parser_settings.on_header_value = parser_on_header_value;
-    s_parser_settings.on_headers_complete = parser_on_header_complete;
-    s_parser_settings.on_message_complete = parser_on_complete;
+    sParserSetting.on_message_begin = parser_on_begin;
+    sParserSetting.on_url = parser_on_url;
+    sParserSetting.on_body = parser_on_body;
+    sParserSetting.on_header_field = parser_on_header_field;
+    sParserSetting.on_header_value = parser_on_header_value;
+    sParserSetting.on_headers_complete = parser_on_header_complete;
+    sParserSetting.on_message_complete = parser_on_complete;
 }
 
 WSGIApplication::WSGIApplication() :
@@ -190,7 +196,6 @@ SERVER_PORT(Server::port())
 
     // for libuv
     client_->tcp->data = this;
-    uv_tcp_init(uv_default_loop(), client_->tcp);
 
     // for http_parser
     client_->parser.data = (void*)this;
@@ -218,7 +223,7 @@ WSGIApplication::parse()
     size_t len = rbuffer_.size();
     if (len > 0)
     {
-        size_t parsed = http_parser_execute(&(client_->parser), &s_parser_settings, data, len);
+        size_t parsed = http_parser_execute(&(client_->parser), &sParserSetting, data, len);
         return parsed == len && client_->parser.http_errno == HPE_OK;
     }
     return false;
@@ -228,7 +233,7 @@ WSGIApplication::parse()
 void
 WSGIApplication::execute()
 {
-    s_wsgi_callback(*this);
+    sWSGIHandler(*this);
 }
 
 
@@ -270,18 +275,16 @@ WSGIApplication::client()
 void
 WSGIApplication::send(const char * data, size_t sz)
 {
-    static const size_t MAX_SEND = 1024 * 1024;
-    static char SENDING[MAX_SEND];
-
-    size_t send_size = sz > MAX_SEND ? MAX_SEND : sz;
+    size_t send_size = sz > sWriteBuffer.size() ? sWriteBuffer.size() : sz;
     size_t remain = sz - send_size;
 
     uv_write_t * w = new uv_write_t;
     w->data = this;
 
-    memcpy(SENDING, data, send_size);
-    uv_buf_t buf = uv_buf_init(SENDING, send_size);
+    sWriteBuffer.copy(data, send_size);
+    uv_buf_t buf = uv_buf_init(sWriteBuffer.data(), send_size);
     uv_write(w, (uv_stream_t*)this->raw_client(), &buf, 1, http_on_write);
+
     if (remain > 0)
     {
         this->send(data + send_size, remain);

@@ -1,5 +1,6 @@
 #include "server.h"
 #include "wsgi.h"
+#include "base/memory.hpp"
 
 #include <uv.h>
 #include <memory.h>
@@ -13,21 +14,23 @@
 #define _TCP(p) ((uv_tcp_t*)(p))
 #define _WSGI(p) ((hydrus::WSGIApplication*)(p->data))
 
-static uv_loop_t    *s_loop     = nullptr;
-static uv_tcp_t      s_http_server;
-static sockaddr_in   s_ipaddr;
-static const char   *s_bind_address = nullptr;
-static int           s_bind_port = 0;
+static uv_loop_t   * sEventLoop     = nullptr;
+static uv_tcp_t      sHttpServer;
+static sockaddr_in   sIPAddress;
+static const char  * sBindAddress   = nullptr;
+static int           sBindPort      = 0;
+
+static hydrus::FixedMemoryPool<65535> sReadBuffer;
 
 
 // ----------------------------------------------
-//  HTTP Server here
+//  HTTP callbacks
 // ----------------------------------------------
 static void
 http_on_allocate(uv_handle_t * handle, size_t suggest, uv_buf_t * buf)
 {
-    buf->base = (char*)malloc(suggest);
-    buf->len = suggest;
+    buf->base = sReadBuffer.data();
+    buf->len = sReadBuffer.size();
 }
 
 
@@ -45,18 +48,13 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         else if (!wsgi->has_buffer())
         {
             delete wsgi;
-            free(buf->base);
             return;
         }
 
         if (wsgi->parse())
-        {
             wsgi->execute();
-        }
         else
-        {
             wsgi->raiseUp(400);
-        }
         delete wsgi;
     }
     else if (nread < 0)
@@ -69,7 +67,6 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         wsgi->append(buf->base, nread);
         uv_read_start(stream, http_on_allocate, http_on_read);
     }
-    free(buf->base);
 }
 
 
@@ -81,7 +78,7 @@ http_on_connection(uv_stream_t *server, int status)
         return;
 
     hydrus::WSGIApplication * app = new hydrus::WSGIApplication();
-    if (uv_accept((uv_stream_t*)&s_http_server, _STREAM(app->raw_client())) < 0)
+    if (uv_accept((uv_stream_t*)&sHttpServer, _STREAM(app->raw_client())) != 0)
     {
         delete app;
     }
@@ -103,23 +100,23 @@ Server::ServerStatus
 Server::listen(const char * address, int port)
 {
     int err;
-    if (s_loop)
+    if (sEventLoop)
         goto SERVER_READY;
 
-    s_loop = uv_default_loop();
-    uv_tcp_init(s_loop, &s_http_server);
-    uv_ip4_addr(address, port, &s_ipaddr);
+    sEventLoop = uv_default_loop();
+    uv_tcp_init(sEventLoop, &sHttpServer);
+    uv_ip4_addr(address, port, &sIPAddress);
 
-    err = uv_tcp_bind(&s_http_server, (sockaddr*)&s_ipaddr, 0);
+    err = uv_tcp_bind(&sHttpServer, (sockaddr*)&sIPAddress, 0);
     if (err)
     {
         return hydrus::Server::INUSED;
     }
-    uv_listen((uv_stream_t*)&s_http_server, HYDRUS_SERVER_BACKLOG, http_on_connection);
+    uv_listen((uv_stream_t*)&sHttpServer, HYDRUS_SERVER_BACKLOG, http_on_connection);
 
 SERVER_READY:
-    s_bind_address = address;
-    s_bind_port = port;
+    sBindAddress = address;
+    sBindPort = port;
     return hydrus::Server::READY;
 }
 
@@ -127,21 +124,21 @@ SERVER_READY:
 void
 Server::run()
 {
-    uv_run(s_loop, UV_RUN_DEFAULT);
+    uv_run(sEventLoop, UV_RUN_DEFAULT);
 }
 
 
 const char *
 Server::host()
 {
-    return s_bind_address;
+    return sBindAddress;
 }
 
 
 int
 Server::port()
 {
-    return s_bind_port;
+    return sBindPort;
 }
 
 
