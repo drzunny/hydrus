@@ -98,6 +98,7 @@ cdef class _HydrusResponse:
         cdef bytes qs = b'' if queryPos < 0 else url[queryPos+1:]
         cdef bytes path = url if queryPos < 0 else url[:queryPos]
 
+        env['HEADERS'] = []
         env['SERVER_SOFTWARE'] = 'hydrus %s' % __VERSION__
         env['SERVER_NAME'] = server_name
         env['SERVER_PORT'] = str(server_port)
@@ -123,15 +124,14 @@ cdef class _HydrusResponse:
         for i in range(n):
             name = self.wsgi.HEADERS[i].name.c_str()
             value = self.wsgi.HEADERS[i].value.c_str()
-            env[name] = value
+            env['HEADERS'].append((name, value))
 
         self.env = env
         return env
 
     def write(self, bytes data):
         if not self.response_content:
-            if not self.wsgi.keepalive():
-                self.headers.append(('Connection', 'Close'))
+            self.headers.extend(self.env['HEADERS'].items())
             for name, val in self.headers:
                 self.response_content += '%s:%s\r\n' % (name, val)
             header = '%s%s' % (self.status, self.response_content)
@@ -147,6 +147,12 @@ cdef class _HydrusResponse:
                     raise exec_info[0], exec_info[1], exec_info[2]
             except:
                 exec_info = None
+
+        # Add special headers
+        headers += self.env['HEADERS'] + [('Server', self.env['SERVER_SOFTWARE'])]
+        if not self.wsgi.keepalive():
+            headers.append(('Connection', 'Close'))
+            
         self.status = 'HTTP/1.1 %s\r\n' % status
         self.headers = headers
         self.write(b'\r\n')

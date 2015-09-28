@@ -63,6 +63,8 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         if (wsgi->parse())
         {
             wsgi->execute();
+            if (!wsgi->keepalive())
+                delete wsgi;
         }
         else
         {
