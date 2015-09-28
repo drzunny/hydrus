@@ -19,6 +19,7 @@ static uv_tcp_t      sHttpServer;
 static sockaddr_in   sIPAddress;
 static const char  * sBindAddress   = nullptr;
 static int           sBindPort      = 0;
+static uv_signal_t   sKeyboardIntep;
 
 #ifndef HY_SMALL_BUFFER
 static hydrus::FixedMemoryPool<65535> sReadBuffer;
@@ -96,6 +97,17 @@ http_on_connection(uv_stream_t *server, int status)
 }
 
 
+static void
+signal_on_terminate(uv_signal_t* handle, int signum)
+{
+    if (signum == SIGTERM)
+    {
+        fprintf(stdout, "Good bye :-)\n");
+        uv_signal_stop(handle);
+        uv_stop(sEventLoop);
+    }
+}
+
 
 // ----------------------------------------------
 //  Server Class Implementation
@@ -131,6 +143,9 @@ SERVER_READY:
 void
 Server::run()
 {
+    uv_signal_init(sEventLoop, &sKeyboardIntep);
+    uv_signal_start(&sKeyboardIntep, signal_on_terminate, SIGTERM);
+
     uv_run(sEventLoop, UV_RUN_DEFAULT);
 }
 
