@@ -100,7 +100,7 @@ http_on_connection(uv_stream_t *server, int status)
 static void
 signal_on_terminate(uv_signal_t* handle, int signum)
 {
-    if (signum == SIGTERM)
+    if (signum == SIGINT)
     {
         fprintf(stdout, "Good bye :-)\n");
         uv_signal_stop(handle);
@@ -144,7 +144,7 @@ void
 Server::run()
 {
     uv_signal_init(sEventLoop, &sKeyboardIntep);
-    uv_signal_start(&sKeyboardIntep, signal_on_terminate, SIGTERM);
+    uv_signal_start(&sKeyboardIntep, signal_on_terminate, SIGINT);
 
     uv_run(sEventLoop, UV_RUN_DEFAULT);
 }

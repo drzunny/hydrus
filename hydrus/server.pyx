@@ -85,7 +85,7 @@ cdef class _HydrusResponse:
         self.wsgi.raiseUp(code)
 
     cdef dict environ(self):
-        env = {'SERVER_SOFTWARE': 'hydrus %s' % __VERSION__}
+        env = {}
 
         cdef bytes url = <bytes>self.wsgi.URL
         cdef bytes body = <bytes>self.wsgi.BODY
@@ -98,6 +98,7 @@ cdef class _HydrusResponse:
         cdef bytes qs = b'' if queryPos < 0 else url[queryPos+1:]
         cdef bytes path = url if queryPos < 0 else url[:queryPos]
 
+        env['SERVER_SOFTWARE'] = 'hydrus %s' % __VERSION__
         env['SERVER_NAME'] = server_name
         env['SERVER_PORT'] = str(server_port)
         env['SERVER_PROTOCOL'] = 'HTTP/1.1'
@@ -111,7 +112,7 @@ cdef class _HydrusResponse:
         env['wsgi.input'] = StringIO(body)
 
         env['wsgi.file_wrapper'] = None
-        env['SCRIPT_NAME'] = ''
+        env['SCRIPT_NAME'] = path.split('/')[1]
         env['wsgi.version'] = (0, 1, 0)
         env['wsgi.multithread'] = False
         env['wsgi.multiprocess'] = True
@@ -189,4 +190,4 @@ def run():
     try:
         hydrus_run()
     except KeyboardInterrupt:
-        print('Bye :-)')
+        print('Keyboard Interrupt, Good Bye :-)')
