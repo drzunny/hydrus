@@ -318,11 +318,16 @@ WSGIApplication::sendFile(int file_fd, size_t sz)
 {    
     auto conn = _CONNECTION(this);
     uv_fs_t * fs = (uv_fs_t*)malloc(sizeof(uv_fs_t));
-    int socketFd = conn->socket;
+
+#if !defined(WIN32) && !defined(_WIN32)
+    int sockfd = conn->io_watcher.fd;
+#else
+    int sockfd = conn->socket;
+#endif
 
     if (sz < kSendFileBuffer)
     {
-        uv_fs_sendfile(uv_default_loop(), fs, socketFd, file_fd, 0, sz, fs_on_sendfile);
+        uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, 0, sz, fs_on_sendfile);
     }
     else
     {
@@ -330,13 +335,13 @@ WSGIApplication::sendFile(int file_fd, size_t sz)
         int offset= 0;
         do
         {
-            uv_fs_sendfile(uv_default_loop(), fs, socketFd, file_fd, offset, kSendFileBuffer, fs_on_sendfile);
+            uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, offset, kSendFileBuffer, fs_on_sendfile);
             remain -= kSendFileBuffer;
             offset += kSendFileBuffer;
         } while (remain >= kSendFileBuffer);
         if (remain > 0)
         {
-            uv_fs_sendfile(uv_default_loop(), fs, socketFd, file_fd, offset, remain, fs_on_sendfile);
+            uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, offset, remain, fs_on_sendfile);
         }
     }
 }
