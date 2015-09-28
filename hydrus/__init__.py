@@ -1,13 +1,8 @@
 # -*- coding:utf8 -*-
 
-import _hydrus
+from . import cluster
+from . import server
 
-__VERSION__ = _hydrus.__VERSION__
+__VERSION__ = server.__VERSION__
 __author__ = 'drz'
 __email__ = 'drzunny@hotmail.com'
-
-
-NOT_IMPORT = []
-ALLOW_IMPORT = []
-
-__all__ = filter(lambda m: m in ALLOW_IMPORT or (not m.startswith('_') and m not in NOT_IMPORT), dir(_hydrus))

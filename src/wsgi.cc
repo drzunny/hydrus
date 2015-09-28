@@ -13,17 +13,27 @@ using namespace std;
 
 #define _WSGI(p) ((hydrus::WSGIApplication*)(p->data))
 #define _CLIENT(p) ((p->client()))
+#define _CONNECTION(p) ((uv_tcp_t*)(p->connection()))
 
 
 // ----------------------------------
 //  Raise Output
 // ----------------------------------
+static const char kWSGIStatus_400[] = { "HTTP/1.1 400 Bad Request\r\nServer: hydrus\r\n\r\n[hydrus]Bad Request" };
+static const char kWSGIStatus_404[] = { "HTTP/1.1 404 Not Found\r\nServer: hydrus\r\n\r\n[hydrus]Not Found" };
+static const char kWSGIStatus_500[] = { "HTTP/1.1 500 Internal Server Error\r\nServer: hydrus\r\n\r\n[hydrus]Internal Server Error" };
 
-static const char kWSGIStatus_400[] = { "HTTP/1.1 400 Bad Request\r\n\r\n" };
-static const char kWSGIStatus_404[] = { "HTTP/1.1 404 Not Found\r\n\r\n" };
-static const char kWSGIStatus_500[] = { "HTTP/1.1 500 Internal Server Error\r\n\r\n" };
+#ifndef HY_SMALL_BUFFER
 
 static hydrus::FixedMemoryPool<1024*1024> sWriteBuffer;
+static const size_t kSendFileBuffer = 1024 * 1024;
+
+#else
+
+static hydrus::FixedMemoryPool<64*1024>   sWriteBuffer;
+static const size_t kSendFileBuffer = 128 * 1024;
+
+#endif
 
 
 // -----------------------------------
@@ -43,7 +53,7 @@ struct hydrus::WSGIClient
     std::string     tName;
     std::string     tValue;
 
-    WSGIClient() :openning(false), tcp(new uv_tcp_t) 
+    WSGIClient() :openning(false), tcp(new uv_tcp_t)
     {
         uv_tcp_init(uv_default_loop(), tcp);
     }
@@ -53,7 +63,6 @@ struct hydrus::WSGIClient
 // -----------------------------------
 //  UV callbacks
 // -----------------------------------
-
 static void
 http_on_write(uv_write_t* req, int status)
 {
@@ -65,6 +74,14 @@ static void
 http_on_close(uv_handle_t * hnd)
 {
     free(hnd);
+}
+
+
+static void
+fs_on_sendfile(uv_fs_t * fs)
+{
+    uv_fs_req_cleanup(fs);
+    free(fs);
 }
 
 
@@ -156,6 +173,7 @@ parser_on_complete(http_parser* pa)
     wsgi->REMOTE_ADDR = s_addr_buf;
     wsgi->REQUEST_METHOD = http_method_str((http_method)pa->method);
     wsgi->CONTENT_LENGTH = pa->content_length;
+    wsgi->setKeepalive(http_should_keep_alive(pa) != 0);
 
     return 0;
 }
@@ -234,6 +252,9 @@ void
 WSGIApplication::execute()
 {
     sWSGIHandler(*this);
+
+    // No need to `shrink_to_fit`
+    rbuffer_.clear();
 }
 
 
@@ -259,7 +280,7 @@ WSGIApplication::raiseUp(int statusCode)
 }
 
 void *
-WSGIApplication::raw_client()
+WSGIApplication::connection()
 {
     return client_->tcp;
 }
@@ -283,11 +304,40 @@ WSGIApplication::send(const char * data, size_t sz)
 
     sWriteBuffer.copy(data, send_size);
     uv_buf_t buf = uv_buf_init(sWriteBuffer.data(), send_size);
-    uv_write(w, (uv_stream_t*)this->raw_client(), &buf, 1, http_on_write);
+    uv_write(w, (uv_stream_t*)this->connection(), &buf, 1, http_on_write);
 
     if (remain > 0)
     {
         this->send(data + send_size, remain);
+    }
+}
+
+
+void
+WSGIApplication::sendFile(int file_fd, size_t sz)
+{    
+    auto conn = _CONNECTION(this);
+    uv_fs_t * fs = (uv_fs_t*)malloc(sizeof(uv_fs_t));
+    int socketFd = conn->socket;
+
+    if (sz < kSendFileBuffer)
+    {
+        uv_fs_sendfile(uv_default_loop(), fs, socketFd, file_fd, 0, sz, fs_on_sendfile);
+    }
+    else
+    {
+        int remain = sz;
+        int offset= 0;
+        do
+        {
+            uv_fs_sendfile(uv_default_loop(), fs, socketFd, file_fd, offset, kSendFileBuffer, fs_on_sendfile);
+            remain -= kSendFileBuffer;
+            offset += kSendFileBuffer;
+        } while (remain >= kSendFileBuffer);
+        if (remain > 0)
+        {
+            uv_fs_sendfile(uv_default_loop(), fs, socketFd, file_fd, offset, remain, fs_on_sendfile);
+        }
     }
 }
 

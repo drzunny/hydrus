@@ -32,7 +32,7 @@ HYDRUS_MACROS = []
 #  Helpers
 # ---------------------------------------------
 def get_version():
-    hydrus_file = os.path.abspath(os.path.dirname(__file__)) + '/hydrus/hydrus.pyx'
+    hydrus_file = os.path.abspath(os.path.dirname(__file__)) + '/hydrus/server.pyx'
     ver = '0.1.0'
     with open(hydrus_file, 'r') as f:
         text = f.read()
@@ -41,6 +41,18 @@ def get_version():
             ver = matches[0]
             print('================\nCurrent Version is: %s\n================' % matches[0])
     return ver
+
+
+def create_extension(name):
+    return Extension(
+        name, HYDRUS_SRC_FILES,
+        include_dirs=HYDRUS_INCLUDES,
+        library_dirs=HYDRUS_LIBPATH,
+        language='c++',
+        libraries=HYDRUS_LIBRARIES,
+        extra_compile_args=HYDRUS_BUILD_FLAGS,
+        define_macros=HYDRUS_MACROS,
+    )
 
 
 # ---------------------------------------------
@@ -56,14 +68,7 @@ setup(
     keywords=('wsgi', 'server', 'web'),
     url='',
     ext_modules=cythonize([
-        Extension(
-            'hydrus.hydrus', HYDRUS_SRC_FILES,
-            include_dirs=HYDRUS_INCLUDES,
-            library_dirs=HYDRUS_LIBPATH,
-            language='c++',
-            libraries=HYDRUS_LIBRARIES,
-            extra_compile_args=HYDRUS_BUILD_FLAGS,
-            define_macros=HYDRUS_MACROS,
-        )
+        create_extension('hydrus.server'),
+        create_extension('hydrus.cluster'),
     ])
 )

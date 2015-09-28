@@ -16,3 +16,5 @@ msvc-build/Release
 /hydrus/hydrus.cpp
 /cython_debug/cython_debug_info_hydrus.hydrus
 /cython_debug/interpreter
+/hydrus/cluster.cpp
+/hydrus/server.cpp

@@ -20,7 +20,11 @@ static sockaddr_in   sIPAddress;
 static const char  * sBindAddress   = nullptr;
 static int           sBindPort      = 0;
 
+#ifndef HY_SMALL_BUFFER
 static hydrus::FixedMemoryPool<65535> sReadBuffer;
+#else
+static hydrus::FixedMemoryPool<4096>  sReadBuffer;
+#endif
 
 
 // ----------------------------------------------
@@ -39,28 +43,31 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
     // NOTICE: WSGI object will be deleted after it write (execute / raise)
     auto wsgi = _WSGI(stream);
-    if (nread == UV_EOF || nread < (ssize_t)buf->len)
+
+    if (nread < 0)
+    {
+        delete wsgi;
+    }
+    else if (nread < (ssize_t)buf->len)
     {
         if (nread > 0)
         {
             wsgi->append(buf->base, nread);
         }
-        else if (!wsgi->has_buffer())
+        else if (!wsgi->hasBuffer())
         {
             delete wsgi;
             return;
         }
-
         if (wsgi->parse())
+        {
             wsgi->execute();
+        }
         else
+        {
             wsgi->raiseUp(400);
-        delete wsgi;
-    }
-    else if (nread < 0)
-    {
-        wsgi->raiseUp(400);
-        delete wsgi;
+            delete wsgi;
+        }
     }
     else
     {
@@ -78,13 +85,13 @@ http_on_connection(uv_stream_t *server, int status)
         return;
 
     hydrus::WSGIApplication * app = new hydrus::WSGIApplication();
-    if (uv_accept((uv_stream_t*)&sHttpServer, _STREAM(app->raw_client())) != 0)
+    if (uv_accept((uv_stream_t*)&sHttpServer, _STREAM(app->connection())) != 0)
     {
         delete app;
     }
     else
     {
-        uv_read_start((uv_stream_t*)app->raw_client(), http_on_allocate, http_on_read);
+        uv_read_start((uv_stream_t*)app->connection(), http_on_allocate, http_on_read);
     }
 }
 

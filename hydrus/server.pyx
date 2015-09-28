@@ -11,6 +11,17 @@ from cython.operator cimport preincrement as iter_inc
 
 __VERSION__ = '0.1.0'
 
+
+# ----------------------------------------------
+#  Helper
+# ----------------------------------------------
+cdef _file_size(f):
+    f.seek(0, 2)
+    n = f.tell()
+    f.seek(0)
+    return n
+
+
 # ----------------------------------------------
 #  C++ definitions
 # ----------------------------------------------
@@ -22,7 +33,9 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
 
     cdef cppclass WSGIApplication:
         void send(const char * buffer, size_t n)
+        void sendFile(int fileFd, size_t n)
         void raiseUp(int code)
+        bint keepalive()
 
         string SERVER_SOFTWARE
         string SERVER_NAME
@@ -110,11 +123,14 @@ cdef class _HydrusResponse:
             name = self.wsgi.HEADERS[i].name.c_str()
             value = self.wsgi.HEADERS[i].value.c_str()
             env[name] = value
+
         self.env = env
         return env
 
     def write(self, bytes data):
         if not self.response_content:
+            if not self.wsgi.keepalive():
+                self.headers.append(('Connection', 'Close'))
             for name, val in self.headers:
                 self.response_content += '%s:%s\r\n' % (name, val)
             header = '%s%s' % (self.status, self.response_content)
@@ -146,7 +162,11 @@ cdef void _hydrus_response_callback(WSGIApplication & wsgi):
             response.raise_error(400)
         else:
             for rs in retval:
-                wsgi.send(rs, len(rs))
+                if isinstance(rs, file):
+                    nread = _file_size(rs)
+                    wsgi.sendFile(rs.fileno(), nread)
+                else:
+                    wsgi.send(rs, len(rs))
     except:
         import traceback
         traceback.print_exc()

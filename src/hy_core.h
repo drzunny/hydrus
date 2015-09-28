@@ -1,7 +1,6 @@
 #ifndef HYDRUS_CORE_H
 #define HYDRUS_CORE_H
 
-#include "base/types.hpp"
 #include "wsgi.h"
 
 void hydrus_setup(hydrus::WSGICallback callback);

@@ -23,15 +23,18 @@ namespace hydrus
         WSGIApplication();
         ~WSGIApplication();
 
-        void    send(const char * data, size_t sz);
-        void    append(const char * buf, size_t nread);
-        bool    parse();
-        void    execute();
-        void    raiseUp(int statusCode);
+        void         send(const char * data, size_t sz);
+        void         sendFile(int file_fd, size_t sz);
+        void         append(const char * buf, size_t nread);
+        bool         parse();
+        void         execute();
+        void         raiseUp(int statusCode);
         WSGIClient * client();
-        void *  raw_client();
+        void *       connection();
 
-        inline bool    has_buffer() const { return !rbuffer_.empty(); }
+        inline bool    hasBuffer() const { return !rbuffer_.empty(); }
+        inline bool    keepalive() const { return keepalive_; }
+        inline void    setKeepalive(bool on) { keepalive_ = on; }
 
         // Properties
         // ---------------------------------
@@ -48,6 +51,7 @@ namespace hydrus
         std::vector<WSGIHeader> HEADERS;
 
     private:
+        bool                keepalive_;
         WSGIClient*         client_;
         std::vector<char>   rbuffer_;
     };
