@@ -60,6 +60,37 @@ struct hydrus::WSGIClient
 };
 
 
+static inline bool
+is_still_keepalive(hydrus::WSGIApplication * wa)
+{
+    auto client = _CLIENT(wa);
+    bool should = wa->keepalive();
+    printf("Is keep?\n");
+    if (should)
+    {
+        // we know content-length, we can keepalive
+        if (wa->contentLength() > 0)
+        {
+            printf("Content length:%d\n", wa->contentLength());
+            return true;
+        }
+        else
+        {
+            // If `Content-Length` is not specified, HTTP 1.1 is default to keep-alive
+            // HTTP 1.0 always close
+            printf("Check is HTTP 1.1\n");
+            return (client->parser.http_major > 0 && client->parser.http_minor > 0);
+        }
+    }
+    else
+    {
+        // Connection: close on HTTP 1.1 or Missing Connection: keep-alive on HTTP 1.0
+        printf("bye\n");
+        return false;
+    }
+}
+
+
 // -----------------------------------
 //  UV callbacks
 // -----------------------------------
@@ -162,19 +193,19 @@ static int
 parser_on_complete(http_parser* pa)
 {
     static char s_addr_buf[64];
-    auto wsgi = _WSGI(pa);
-    auto client = _CLIENT(wsgi);
+    hydrus::WSGIApplication * wsgi = _WSGI(pa);
+    uv_tcp_t * connection = _CONNECTION(wsgi);
 
     sockaddr_in ip;
     int len;
-    uv_tcp_getpeername(client->tcp, (sockaddr*)&ip, &len);
+    uv_tcp_getpeername(connection, (sockaddr*)&ip, &len);
     uv_ip4_name(&ip, s_addr_buf, len);
 
     wsgi->REMOTE_ADDR = s_addr_buf;
     wsgi->REQUEST_METHOD = http_method_str((http_method)pa->method);
-    wsgi->CONTENT_LENGTH = pa->content_length;
-    wsgi->setKeepalive(http_should_keep_alive(pa) != 0);
 
+    // check this request is keep-alive or not
+    wsgi->setKeepalive(http_should_keep_alive(pa) != 0);
     return 0;
 }
 
@@ -205,14 +236,15 @@ WSGIReady(WSGICallback callback)
 }
 
 WSGIApplication::WSGIApplication() :
-client_(new WSGIClient),
-SERVER_NAME(Server::host()),
-SERVER_PORT(Server::port())
+    SERVER_NAME(Server::host()),
+    SERVER_PORT(Server::port()),
+    contentLength_(0)
 {
     // for headers
     HEADERS.reserve(16);
 
     // for libuv
+    client_ = new WSGIClient();
     client_->tcp->data = this;
 
     // for http_parser
@@ -253,7 +285,7 @@ WSGIApplication::execute()
 {
     sWSGIHandler(*this);
 
-    // No need to `shrink_to_fit`
+    this->setKeepalive(is_still_keepalive(this));
     rbuffer_.clear();
 }
 

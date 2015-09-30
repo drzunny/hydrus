@@ -35,6 +35,7 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
         void send(const char * buffer, size_t n)
         void sendFile(int fileFd, size_t n)
         void raiseUp(int code)
+        void setContentLength(unsigned long long len)
         bint keepalive()
 
         string SERVER_SOFTWARE
@@ -42,7 +43,6 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
         string SERVER_PROTOCOL
         string REQUEST_METHOD
         string REMOTE_ADDR
-        size_t CONTENT_LENGTH
         int SERVER_PORT
         string URL
         string BODY
@@ -124,16 +124,27 @@ cdef class _HydrusResponse:
         for i in range(n):
             name = self.wsgi.HEADERS[i].name.c_str()
             value = self.wsgi.HEADERS[i].value.c_str()
-            env['HEADERS'].append((name, value))
+            env[name] = value
 
         self.env = env
         return env
 
     def write(self, bytes data):
+        cdef bint hasContentLength = 0
+        cdef bint hasTransferEncoding = 0
         if not self.response_content:
-            self.headers.extend(self.env['HEADERS'].items())
             for name, val in self.headers:
+                if name == 'Content-Length':
+                    hasContentLength = 1
+                    self.wsgi.setContentLength(long(val))
+                elif name == 'Transfer-Encoding':
+                    hasTransferEncoding = 1
                 self.response_content += '%s:%s\r\n' % (name, val)
+
+            # if `Content-Length` was not specified, use chunked mode
+            if not hasContentLength and not hasTransferEncoding:
+                self.response_content += '%s:%s\r\n' % ('Transfer-Encoding', 'chunked')
+
             header = '%s%s' % (self.status, self.response_content)
             self.wsgi.send(header, len(header))
         if data:
@@ -150,9 +161,7 @@ cdef class _HydrusResponse:
 
         # Add special headers
         headers += self.env['HEADERS'] + [('Server', self.env['SERVER_SOFTWARE'])]
-        if not self.wsgi.keepalive():
-            headers.append(('Connection', 'Close'))
-            
+
         self.status = 'HTTP/1.1 %s\r\n' % status
         self.headers = headers
         self.write(b'\r\n')

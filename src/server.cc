@@ -104,7 +104,6 @@ signal_on_terminate(uv_signal_t* handle, int signum)
 {
     if (signum == SIGINT)
     {
-        fprintf(stdout, "Good bye :-)\n");
         uv_signal_stop(handle);
         uv_stop(sEventLoop);
     }
