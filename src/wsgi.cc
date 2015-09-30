@@ -65,27 +65,23 @@ is_still_keepalive(hydrus::WSGIApplication * wa)
 {
     auto client = _CLIENT(wa);
     bool should = wa->keepalive();
-    printf("Is keep?\n");
     if (should)
     {
         // we know content-length, we can keepalive
         if (wa->contentLength() > 0)
         {
-            printf("Content length:%d\n", wa->contentLength());
             return true;
         }
         else
         {
             // If `Content-Length` is not specified, HTTP 1.1 is default to keep-alive
             // HTTP 1.0 always close
-            printf("Check is HTTP 1.1\n");
             return (client->parser.http_major > 0 && client->parser.http_minor > 0);
         }
     }
     else
     {
         // Connection: close on HTTP 1.1 or Missing Connection: keep-alive on HTTP 1.0
-        printf("bye\n");
         return false;
     }
 }
@@ -285,6 +281,7 @@ WSGIApplication::execute()
 {
     sWSGIHandler(*this);
 
+    // recheck the connection should be keepalive or not
     this->setKeepalive(is_still_keepalive(this));
     rbuffer_.clear();
 }
