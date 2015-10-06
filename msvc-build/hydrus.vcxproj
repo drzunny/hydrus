@@ -29,18 +29,19 @@
     <ProjectGuid>{F2C3097A-FC73-4F0D-915A-9FF9991C9D63}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>hydrus</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120_xp</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120_xp</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -64,6 +65,7 @@
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)..\3rd\prebuilt\include;$(PYTHON_HOME)\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\3rd\prebuilt\libs;$(PYTHON_HOME)\libs;$(LibraryPath)</LibraryPath>
+    <TargetExt>.pyd</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -74,7 +76,7 @@
       <PreprocessorDefinitions>SSE_ENABLED;WIN32;_DEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <TreatWarningAsError>false</TreatWarningAsError>
-      <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
+      <DisableSpecificWarnings>5027;5026;4711;4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -94,7 +96,7 @@
       <PreprocessorDefinitions>SSE_ENABLED;WIN32;NDEBUG;_WINDOWS;_USRDLL;HYDRUS_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <DisableSpecificWarnings>4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
+      <DisableSpecificWarnings>5027;5026;4711;4127;4244;4820;4100;4350;4514;4625;4626;4668;4710;4365;4309</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -103,6 +105,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(SolutionDir)..\3rd\libuv\Release\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>python27.lib;ws2_32.lib;psapi.lib;Iphlpapi.lib;userenv.lib;libuv.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>libcmt.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -63,9 +63,6 @@ cdef extern from "../src/hy_core.h":
 # ----------------------------------------------
 G_hy_app = None
 
-cdef class HydrusFileWrapper:
-    pass
-
 
 cdef class _HydrusResponse:
     cdef str status
@@ -84,9 +81,8 @@ cdef class _HydrusResponse:
     cdef void raise_error(self, int code):
         self.wsgi.raiseUp(code)
 
-    cdef dict environ(self):
-        env = {}
-
+    cdef dict environ_vars(self):
+        cdef dict env = {}
         cdef bytes url = <bytes>self.wsgi.URL
         cdef bytes body = <bytes>self.wsgi.BODY
         cdef bytes server_name = <bytes>self.wsgi.SERVER_NAME
@@ -112,7 +108,7 @@ cdef class _HydrusResponse:
         env['wsgi.errors'] = sys.stderr
         env['wsgi.input'] = StringIO(body)
 
-        env['wsgi.file_wrapper'] = None
+        # env['wsgi.file_wrapper'] = None
         env['SCRIPT_NAME'] = path.split('/')[1]
         env['wsgi.version'] = (0, 1, 0)
         env['wsgi.multithread'] = False
@@ -168,9 +164,9 @@ cdef class _HydrusResponse:
 
 
 cdef void _hydrus_response_callback(WSGIApplication & wsgi):
-    response = _HydrusResponse()
-    response.wsgi = &wsgi
-    environ = response.environ()
+    cdef _HydrusResponse response = _HydrusResponse()
+    cdef dict environ = response.environ_vars()
+    response.wsgi = &wsgi    
 
     try:
         retval = G_hy_app(environ, response.start_response)
