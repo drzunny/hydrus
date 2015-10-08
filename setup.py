@@ -15,7 +15,7 @@ if platform.system() == 'Windows':
     HYDRUS_INCLUDES = ['3rd/prebuilt/include']
     HYDRUS_LIBRARIES = ['libuv', 'ws2_32', 'IPHLPAPI', 'Psapi', 'Userenv', 'advapi32']
     HYDRUS_LIBPATH = ['3rd/prebuilt/libs']
-    HYDRUS_BUILD_FLAGS = []
+    HYDRUS_BUILD_FLAGS = ['/EHsc']
 else:
     HYDRUS_INCLUDES = []
     HYDRUS_LIBRARIES = ['uv']
