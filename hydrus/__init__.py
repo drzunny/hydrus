@@ -1,6 +1,5 @@
 # -*- coding:utf8 -*-
 
-from . import cluster
 from . import server
 
 __VERSION__ = server.__VERSION__

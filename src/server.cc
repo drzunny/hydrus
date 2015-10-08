@@ -75,7 +75,6 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
     else
     {
         wsgi->append(buf->base, nread);
-        uv_read_start(stream, http_on_allocate, http_on_read);
     }
 }
 
@@ -83,7 +82,6 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 static void
 http_on_connection(uv_stream_t *server, int status)
 {
-    static int failCounter = 0;
     if (status != 0)
         return;
 

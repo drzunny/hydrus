@@ -165,8 +165,9 @@ cdef class _HydrusResponse:
 
 cdef void _hydrus_response_callback(WSGIApplication & wsgi):
     cdef _HydrusResponse response = _HydrusResponse()
+    response.wsgi = &wsgi
+    
     cdef dict environ = response.environ_vars()
-    response.wsgi = &wsgi    
 
     try:
         retval = G_hy_app(environ, response.start_response)

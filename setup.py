@@ -69,6 +69,5 @@ setup(
     url='',
     ext_modules=cythonize([
         create_extension('hydrus.server'),
-        create_extension('hydrus.cluster'),
     ])
 )

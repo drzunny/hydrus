@@ -344,7 +344,7 @@ WSGIApplication::send(const char * data, size_t sz)
 
 void
 WSGIApplication::sendFile(int file_fd, size_t sz)
-{    
+{
     auto conn = _CONNECTION(this);
     uv_fs_t * fs = (uv_fs_t*)malloc(sizeof(uv_fs_t));
 
