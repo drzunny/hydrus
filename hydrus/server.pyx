@@ -44,6 +44,7 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
         string REQUEST_METHOD
         string REMOTE_ADDR
         int SERVER_PORT
+        bint SERVER_CLOSED
         string URL
         string BODY
         vector[WSGIHeader] HEADERS
@@ -128,6 +129,7 @@ cdef class _HydrusResponse:
     def write(self, bytes data):
         cdef bint hasContentLength = 0
         cdef bint hasTransferEncoding = 0
+        cdef bint hasConnectionClosed = 0
         if not self.response_content:
             for name, val in self.headers:
                 if name == 'Content-Length':
@@ -135,11 +137,22 @@ cdef class _HydrusResponse:
                     self.wsgi.setContentLength(long(val))
                 elif name == 'Transfer-Encoding':
                     hasTransferEncoding = 1
+                elif name == 'Connection' and val.lower() == 'close':
+                    self.wsgi.SERVER_CLOSED = 1
+                    hasConnectionClosed = 1
                 self.response_content += '%s:%s\r\n' % (name, val)
-
-            # if `Content-Length` was not specified, use chunked mode
-            if not hasContentLength and not hasTransferEncoding:
-                self.response_content += '%s:%s\r\n' % ('Transfer-Encoding', 'chunked')
+            
+            # is keepalive connection ?            
+            if self.wsgi.keepalive():
+                # if `Content-Length` was not specified, use chunked mode
+                if not hasContentLength and not hasTransferEncoding:
+                    self.response_content += '%s:%s\r\n' % ('Transfer-Encoding', 'chunked')
+            else:
+                # if `Connection:close` was not specified, but not keepalive (For HTTP 1.1)
+                if not hasConnectionClosed:
+                    self.response_content += 'Connection:close\r\n'
+            
+            
 
             header = '%s%s' % (self.status, self.response_content)
             self.wsgi.send(header, len(header))

@@ -42,9 +42,6 @@ static const size_t kSendFileBuffer = 128 * 1024;
 static hydrus::WSGICallback sWSGIHandler = nullptr;
 static http_parser_settings sParserSetting;
 
-static const char * kHydrusServerName = "hydrus";
-
-
 struct hydrus::WSGIClient
 {
     uv_tcp_t*       tcp;
@@ -58,33 +55,6 @@ struct hydrus::WSGIClient
         uv_tcp_init(uv_default_loop(), tcp);
     }
 };
-
-
-static inline bool
-is_still_keepalive(hydrus::WSGIApplication * wa)
-{
-    auto client = _CLIENT(wa);
-    bool should = wa->keepalive();
-    if (should)
-    {
-        // we know content-length, we can keepalive
-        if (wa->contentLength() > 0)
-        {
-            return true;
-        }
-        else
-        {
-            // If `Content-Length` is not specified, HTTP 1.1 is default to keep-alive
-            // HTTP 1.0 always close
-            return (client->parser.http_major > 0 && client->parser.http_minor > 0);
-        }
-    }
-    else
-    {
-        // Connection: close on HTTP 1.1 or Missing Connection: keep-alive on HTTP 1.0
-        return false;
-    }
-}
 
 
 // -----------------------------------
@@ -107,6 +77,7 @@ http_on_close(uv_handle_t * hnd)
 static void
 fs_on_sendfile(uv_fs_t * fs)
 {
+    auto wsgi = _WSGI(fs);
     uv_fs_req_cleanup(fs);
     free(fs);
 }
@@ -200,8 +171,6 @@ parser_on_complete(http_parser* pa)
     wsgi->REMOTE_ADDR = s_addr_buf;
     wsgi->REQUEST_METHOD = http_method_str((http_method)pa->method);
 
-    // check this request is keep-alive or not
-    wsgi->setKeepalive(http_should_keep_alive(pa) != 0);
     return 0;
 }
 
@@ -234,7 +203,8 @@ WSGIReady(WSGICallback callback)
 WSGIApplication::WSGIApplication() :
     SERVER_NAME(Server::host()),
     SERVER_PORT(Server::port()),
-    contentLength_(0)
+    contentLength_(0),
+    SERVER_CLOSED(false)
 {
     // for headers
     HEADERS.reserve(16);
@@ -280,9 +250,6 @@ void
 WSGIApplication::execute()
 {
     sWSGIHandler(*this);
-
-    // recheck the connection should be keepalive or not
-    this->setKeepalive(is_still_keepalive(this));
     rbuffer_.clear();
 }
 
@@ -316,29 +283,59 @@ WSGIApplication::connection()
 
 
 WSGIClient*
-WSGIApplication::client()
+WSGIApplication::client() const
 {
     return client_;
+}
+
+
+bool
+WSGIApplication::keepalive() const
+{
+    auto client = _CLIENT(this);
+    bool shouldKeepalive = http_should_keep_alive(&client->parser) != 0;
+    bool hasKeepalive = (client->parser.flags & F_CONNECTION_KEEP_ALIVE) != 0;
+
+    if (shouldKeepalive && hasKeepalive)
+    {
+        // we know content-length, we can keepalive
+        if (this->contentLength() > 0)
+        {
+            return true;
+        }
+        else
+        {
+            // If `Content-Length` is not specified, HTTP 1.1 is default to keep-alive
+            // HTTP 1.0 always close
+            return (client->parser.http_major > 0 && client->parser.http_minor > 0);
+        }
+    }
+    else
+    {
+        // Connection: close on HTTP 1.1 or Missing Connection: keep-alive on HTTP 1.0
+        return false;
+    }
 }
 
 
 void
 WSGIApplication::send(const char * data, size_t sz)
 {
-    size_t send_size = sz > sWriteBuffer.size() ? sWriteBuffer.size() : sz;
-    size_t remain = sz - send_size;
+    size_t remain = sz;
+    size_t send_size;
 
-    uv_write_t * w = new uv_write_t;
-    w->data = this;
-
-    sWriteBuffer.copy(data, send_size);
-    uv_buf_t buf = uv_buf_init(sWriteBuffer.data(), send_size);
-    uv_write(w, (uv_stream_t*)this->connection(), &buf, 1, http_on_write);
-
-    if (remain > 0)
+    do
     {
-        this->send(data + send_size, remain);
-    }
+        send_size = remain > sWriteBuffer.size() ? sWriteBuffer.size() : remain;
+        remain -= send_size;
+
+        uv_write_t * w = new uv_write_t;
+        w->data = this;
+
+        sWriteBuffer.copy(data, send_size);
+        uv_buf_t buf = uv_buf_init(sWriteBuffer.data(), send_size);
+        uv_write(w, (uv_stream_t*)this->connection(), &buf, 1, http_on_write);
+    } while (remain > 0);
 }
 
 
@@ -346,7 +343,6 @@ void
 WSGIApplication::sendFile(int file_fd, size_t sz)
 {
     auto conn = _CONNECTION(this);
-    uv_fs_t * fs = (uv_fs_t*)malloc(sizeof(uv_fs_t));
 
 #if !defined(WIN32) && !defined(_WIN32)
     int sockfd = conn->io_watcher.fd;
@@ -354,25 +350,21 @@ WSGIApplication::sendFile(int file_fd, size_t sz)
     int sockfd = conn->socket;
 #endif
 
-    if (sz < kSendFileBuffer)
+    size_t remain = sz;
+    size_t send_size;
+    int offset = 0;
+
+    do
     {
-        uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, 0, sz, fs_on_sendfile);
-    }
-    else
-    {
-        int remain = sz;
-        int offset= 0;
-        do
-        {
-            uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, offset, kSendFileBuffer, fs_on_sendfile);
-            remain -= kSendFileBuffer;
-            offset += kSendFileBuffer;
-        } while (remain >= kSendFileBuffer);
-        if (remain > 0)
-        {
-            uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, offset, remain, fs_on_sendfile);
-        }
-    }
+        send_size = remain > kSendFileBuffer ? kSendFileBuffer : remain;
+        remain -= send_size;
+
+        uv_fs_t * fs = new uv_fs_t;
+        fs->data = this;
+
+        uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, offset, kSendFileBuffer, fs_on_sendfile);
+        offset += send_size;
+    } while (remain > 0);
 }
 
 

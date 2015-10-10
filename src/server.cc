@@ -62,8 +62,9 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         }
         if (wsgi->parse())
         {
+            // wsgi will be deleted automatically by itself
             wsgi->execute();
-            if (!wsgi->keepalive())
+            if (wsgi->SERVER_CLOSED || !wsgi->keepalive())
                 delete wsgi;
         }
         else

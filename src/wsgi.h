@@ -29,17 +29,19 @@ namespace hydrus
         bool         parse();
         void         execute();
         void         raiseUp(int statusCode);
-        WSGIClient * client();
+        WSGIClient * client() const;
         void *       connection();
+        bool         keepalive() const;
 
         inline uint64_t contentLength() const { return contentLength_; }
         inline bool     hasBuffer() const { return !rbuffer_.empty(); }
-        inline bool     keepalive() const { return keepalive_; }
-        inline void     setKeepalive(bool on) { keepalive_ = on; }
         inline void     setContentLength(uint64_t len) { contentLength_ = len; }
 
         // Properties
         // ---------------------------------
+
+        /* For 1.1 */
+        bool                    SERVER_CLOSED;
 
         /* HTTP */
         Str                     SERVER_SOFTWARE;
@@ -52,7 +54,6 @@ namespace hydrus
         std::vector<WSGIHeader> HEADERS;
 
     private:
-        bool                keepalive_;
         uint64_t            contentLength_;
         WSGIClient*         client_;
         std::vector<char>   rbuffer_;
