@@ -56,6 +56,21 @@ struct hydrus::WSGIClient
     }
 };
 
+inline static uint64_t
+_stringToUint64(const string & s)
+{
+    const char * ptr = s.c_str();
+    int len = s.length();
+    uint64_t num = 0;
+
+    for (int i = 0; i < len; i++)
+    {
+        num *= 10;
+        num += ptr[i] - '0';
+    }
+    return num;
+}
+
 
 // -----------------------------------
 //  UV callbacks
@@ -77,7 +92,6 @@ http_on_close(uv_handle_t * hnd)
 static void
 fs_on_sendfile(uv_fs_t * fs)
 {
-    auto wsgi = _WSGI(fs);
     uv_fs_req_cleanup(fs);
     free(fs);
 }
@@ -136,6 +150,15 @@ parser_on_header_value(http_parser* pa, const char *at, size_t length)
 
     client->tValue = string(at, length);
     client->openning = false;
+
+    if (client->tName.compare("Content-Type") == 0)
+    {
+        wsgi->CONTENT_TYPE = client->tValue;
+    }
+    else if (client->tName.compare("Content-Length") == 0)
+    {
+        wsgi->CONTENT_LENGTH = _stringToUint64(client->tValue);
+    }
 
     wsgi->HEADERS.push_back({ client->tName, client->tValue });
     return 0;
@@ -203,7 +226,7 @@ WSGIReady(WSGICallback callback)
 WSGIApplication::WSGIApplication() :
     SERVER_NAME(Server::host()),
     SERVER_PORT(Server::port()),
-    contentLength_(0),
+    CONTENT_LENGTH(0),
     SERVER_CLOSED(false)
 {
     // for headers
@@ -299,7 +322,7 @@ WSGIApplication::keepalive() const
     if (shouldKeepalive && hasKeepalive)
     {
         // we know content-length, we can keepalive
-        if (this->contentLength() > 0)
+        if (this->CONTENT_LENGTH > 0)
         {
             return true;
         }

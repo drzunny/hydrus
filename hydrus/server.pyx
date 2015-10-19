@@ -35,7 +35,6 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
         void send(const char * buffer, size_t n)
         void sendFile(int fileFd, size_t n)
         void raiseUp(int code)
-        void setContentLength(unsigned long long len)
         bint keepalive()
 
         string SERVER_SOFTWARE
@@ -47,6 +46,8 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
         bint SERVER_CLOSED
         string URL
         string BODY
+        string CONTENT_TYPE
+        unsigned long long CONTENT_LENGTH
         vector[WSGIHeader] HEADERS
 
 
@@ -90,6 +91,8 @@ cdef class _HydrusResponse:
         cdef int server_port = self.wsgi.SERVER_PORT
         cdef bytes request_method = <bytes>self.wsgi.REQUEST_METHOD
         cdef bytes remote_addr = <bytes>self.wsgi.REMOTE_ADDR
+        cdef bytes content_type = <bytes>self.wsgi.CONTENT_TYPE
+        cdef unsigned long long content_length = self.wsgi.CONTENT_LENGTH
 
         cdef int queryPos = url.find('?')
         cdef bytes qs = b'' if queryPos < 0 else url[queryPos+1:]
@@ -104,6 +107,8 @@ cdef class _HydrusResponse:
         env['REMOTE_ADDR'] = remote_addr
         env['PATH_INFO'] = path
         env['QUERY_STRING'] = qs
+        env['CONTENT_LENGTH'] = content_length
+        env['CONTENT_TYPE'] = content_type
 
         # WSGI parameters
         env['wsgi.errors'] = sys.stderr
@@ -134,7 +139,6 @@ cdef class _HydrusResponse:
             for name, val in self.headers:
                 if name == 'Content-Length':
                     hasContentLength = 1
-                    self.wsgi.setContentLength(long(val))
                 elif name == 'Transfer-Encoding':
                     hasTransferEncoding = 1
                 elif name == 'Connection' and val.lower() == 'close':

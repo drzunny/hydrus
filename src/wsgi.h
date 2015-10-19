@@ -33,9 +33,7 @@ namespace hydrus
         void *       connection();
         bool         keepalive() const;
 
-        inline uint64_t contentLength() const { return contentLength_; }
         inline bool     hasBuffer() const { return !rbuffer_.empty(); }
-        inline void     setContentLength(uint64_t len) { contentLength_ = len; }
 
         // Properties
         // ---------------------------------
@@ -44,6 +42,8 @@ namespace hydrus
         bool                    SERVER_CLOSED;
 
         /* HTTP */
+        uint64_t                CONTENT_LENGTH;
+        Str                     CONTENT_TYPE;
         Str                     SERVER_SOFTWARE;
         Str                     SERVER_NAME;
         int                     SERVER_PORT;
@@ -54,7 +54,6 @@ namespace hydrus
         std::vector<WSGIHeader> HEADERS;
 
     private:
-        uint64_t            contentLength_;
         WSGIClient*         client_;
         std::vector<char>   rbuffer_;
     };
