@@ -4,6 +4,8 @@
 ----------------------------------
 A lightweight and fast enough WSGI server for Python.
 
+> :warning: Hydrus is under development. I suggest that you should not use in production environment
+
 # Dependences
 ----------------------------------
 **hydrus** is written by C++11, these build tools are required:
