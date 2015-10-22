@@ -42,7 +42,6 @@ http_on_allocate(uv_handle_t * handle, size_t suggest, uv_buf_t * buf)
 static void
 http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
-    // NOTICE: WSGI object will be deleted after it write (execute / raise)
     auto wsgi = _WSGI(stream);
 
     if (nread < 0)
@@ -62,8 +61,8 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         }
         if (wsgi->parse())
         {
-            // wsgi will be deleted automatically by itself
             wsgi->execute();
+            // support keep-alive
             if (wsgi->SERVER_CLOSED || !wsgi->keepalive())
                 delete wsgi;
         }

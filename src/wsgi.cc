@@ -50,7 +50,7 @@ struct hydrus::WSGIClient
     std::string     tName;
     std::string     tValue;
 
-    WSGIClient() :openning(false), tcp(new uv_tcp_t)
+    WSGIClient() :openning(false), tcp((uv_tcp_t*)malloc(sizeof(uv_tcp_t)))
     {
         uv_tcp_init(uv_default_loop(), tcp);
     }
@@ -182,16 +182,16 @@ parser_on_header_complete(http_parser* pa)
 static int
 parser_on_complete(http_parser* pa)
 {
-    static char s_addr_buf[64];
     hydrus::WSGIApplication * wsgi = _WSGI(pa);
     uv_tcp_t * connection = _CONNECTION(wsgi);
-
     sockaddr_in ip;
-    int len;
-    uv_tcp_getpeername(connection, (sockaddr*)&ip, &len);
-    uv_ip4_name(&ip, s_addr_buf, len);
 
-    wsgi->REMOTE_ADDR = s_addr_buf;
+    int len;
+    char address[64];
+    uv_tcp_getpeername(connection, (sockaddr*)&ip, &len);
+    uv_ip4_name(&ip, address, len);
+
+    wsgi->REMOTE_ADDR = string(address, len);
     wsgi->REQUEST_METHOD = http_method_str((http_method)pa->method);
 
     return 0;
@@ -352,7 +352,7 @@ WSGIApplication::send(const char * data, size_t sz)
         send_size = remain > sWriteBuffer.size() ? sWriteBuffer.size() : remain;
         remain -= send_size;
 
-        uv_write_t * w = new uv_write_t;
+        uv_write_t * w = (uv_write_t*)malloc(sizeof(*w));
         w->data = this;
 
         sWriteBuffer.copy(data, send_size);
@@ -382,7 +382,7 @@ WSGIApplication::sendFile(int file_fd, size_t sz)
         send_size = remain > kSendFileBuffer ? kSendFileBuffer : remain;
         remain -= send_size;
 
-        uv_fs_t * fs = new uv_fs_t;
+        uv_fs_t * fs = (uv_fs_t*)malloc(sizeof(*fs));
         fs->data = this;
 
         uv_fs_sendfile(uv_default_loop(), fs, sockfd, file_fd, offset, kSendFileBuffer, fs_on_sendfile);
