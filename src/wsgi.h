@@ -25,15 +25,15 @@ namespace hydrus
 
         void         send(const char * data, size_t sz);
         void         sendFile(int file_fd, size_t sz);
-        void         append(const char * buf, size_t nread);
-        bool         parse();
+        bool         parse(const char * data, size_t len);
         void         execute();
         void         raiseUp(int statusCode);
         WSGIClient * client() const;
         void *       connection();
         bool         keepalive() const;
 
-        inline bool     hasBuffer() const { return !rbuffer_.empty(); }
+        inline bool  finished() const { return finished_; }
+        inline void  setFinished(bool on) { finished_ = on; }
 
         // Properties
         // ---------------------------------
@@ -55,7 +55,7 @@ namespace hydrus
 
     private:
         WSGIClient*         client_;
-        std::vector<char>   rbuffer_;
+        bool                finished_;
     };
 
     // Declare the WSGI Callback

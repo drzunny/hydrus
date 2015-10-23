@@ -44,37 +44,28 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
     auto wsgi = _WSGI(stream);
 
-    if (nread < 0)
+    if (nread <= 0)
     {
         delete wsgi;
     }
-    else if (nread < (ssize_t)buf->len)
-    {
-        if (nread > 0)
+    else
+    {        
+        if (wsgi->parse(buf->base, nread))
         {
-            wsgi->append(buf->base, nread);
-        }
-        else if (!wsgi->hasBuffer())
-        {
-            delete wsgi;
-            return;
-        }
-        if (wsgi->parse())
-        {
-            wsgi->execute();
-            // support keep-alive
-            if (wsgi->SERVER_CLOSED || !wsgi->keepalive())
-                delete wsgi;
+            if (wsgi->finished())
+            {
+                std::string s(buf->base, nread);
+                wsgi->execute();
+                // support keep-alive
+                if (wsgi->SERVER_CLOSED || !wsgi->keepalive())
+                    delete wsgi;
+            }
         }
         else
         {
             wsgi->raiseUp(400);
             delete wsgi;
         }
-    }
-    else
-    {
-        wsgi->append(buf->base, nread);
     }
 }
 

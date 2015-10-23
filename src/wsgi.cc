@@ -111,7 +111,7 @@ parser_on_begin(http_parser * pa)
 static int
 parser_on_url(http_parser* pa, const char *at, size_t length)
 {
-    auto wsgi = _WSGI(pa);
+    auto wsgi = _WSGI(pa);    
     wsgi->URL = string(at, length);
     return 0;
 }
@@ -170,19 +170,6 @@ parser_on_header_complete(http_parser* pa)
 {
     auto wsgi = _WSGI(pa);
     auto client = _CLIENT(wsgi);
-
-    if (client->openning)
-    {
-        return -1;
-    }
-    return 0;
-}
-
-
-static int
-parser_on_complete(http_parser* pa)
-{
-    hydrus::WSGIApplication * wsgi = _WSGI(pa);
     uv_tcp_t * connection = _CONNECTION(wsgi);
     sockaddr_in ip;
 
@@ -194,9 +181,21 @@ parser_on_complete(http_parser* pa)
     wsgi->REMOTE_ADDR = string(address, len);
     wsgi->REQUEST_METHOD = http_method_str((http_method)pa->method);
 
+    if (client->openning)
+    {
+        return -1;
+    }
     return 0;
 }
 
+
+static int
+parser_on_complete(http_parser* pa)
+{   
+    auto wsgi = _WSGI(pa);
+    wsgi->setFinished(true);
+    return 0;
+}
 
 
 // -----------------------------------
@@ -227,6 +226,7 @@ WSGIApplication::WSGIApplication() :
     SERVER_NAME(Server::host()),
     SERVER_PORT(Server::port()),
     CONTENT_LENGTH(0),
+    finished_ (false),
     SERVER_CLOSED(false)
 {
     // for headers
@@ -248,18 +248,10 @@ WSGIApplication::~WSGIApplication()
     delete client_;
 }
 
-void
-WSGIApplication::append(const char * buffer, size_t nread)
-{
-    rbuffer_.insert(rbuffer_.end(), buffer, buffer + nread);
-}
-
 
 bool
-WSGIApplication::parse()
+WSGIApplication::parse(const char *data, size_t len)
 {
-    const char * data = rbuffer_.data();
-    size_t len = rbuffer_.size();
     if (len > 0)
     {
         size_t parsed = http_parser_execute(&(client_->parser), &sParserSetting, data, len);
@@ -273,7 +265,6 @@ void
 WSGIApplication::execute()
 {
     sWSGIHandler(*this);
-    rbuffer_.clear();
 }
 
 

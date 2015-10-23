@@ -113,9 +113,9 @@ cdef class _HydrusResponse:
         # WSGI parameters
         env['wsgi.errors'] = sys.stderr
         env['wsgi.input'] = StringIO(body)
-
+        
         # env['wsgi.file_wrapper'] = None
-        env['SCRIPT_NAME'] = path.split('/')[1]
+        env['SCRIPT_NAME'] = ''
         env['wsgi.version'] = (0, 1, 0)
         env['wsgi.multithread'] = False
         env['wsgi.multiprocess'] = True
