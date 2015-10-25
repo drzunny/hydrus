@@ -37,9 +37,7 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
         void raiseUp(int code)
         bint keepalive()
 
-        string SERVER_SOFTWARE
         string SERVER_NAME
-        string SERVER_PROTOCOL
         string REQUEST_METHOD
         string REMOTE_ADDR
         int SERVER_PORT

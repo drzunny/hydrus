@@ -44,7 +44,6 @@ namespace hydrus
         /* HTTP */
         uint64_t                CONTENT_LENGTH;
         Str                     CONTENT_TYPE;
-        Str                     SERVER_SOFTWARE;
         Str                     SERVER_NAME;
         int                     SERVER_PORT;
         Str                     REQUEST_METHOD;
