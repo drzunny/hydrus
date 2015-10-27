@@ -312,6 +312,8 @@ WSGIApplication::raiseUp(int statusCode)
         this->send("\r\n\r\n", 4);
         break;
     }
+    // if raise, close connection
+    this->SERVER_CLOSED = true;
 }
 
 void *

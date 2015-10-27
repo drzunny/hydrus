@@ -157,11 +157,8 @@ cdef class _HydrusResponse:
 
             bufs += self.status
             bufs += self.response_content
-            # header = '%s%s' % (self.status, self.response_content)
-            # self.wsgi.send(header, len(header))
         if data:
             bufs += data
-            #  self.wsgi.send(data, len(data))
         if bufs:
             self.wsgi.send(bufs, len(bufs))
 
@@ -190,15 +187,12 @@ cdef void _hydrus_response_callback(WSGIApplication & wsgi):
 
     try:
         retval = G_hy_app(environ, response.start_response)
-        if not response.response_content:
-            response.raise_error(400)
-        else:
-            for rs in retval:
-                if isinstance(rs, file):
-                    nread = _file_size(rs)
-                    wsgi.sendFile(rs.fileno(), nread)
-                else:
-                    wsgi.send(rs, len(rs))
+        for rs in retval:
+            if isinstance(rs, file):
+                nread = _file_size(rs)
+                wsgi.sendFile(rs.fileno(), nread)
+            else:
+                wsgi.send(rs, len(rs))
     except:
         import traceback
         traceback.print_exc()

@@ -54,7 +54,6 @@ http_on_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
         {
             if (wsgi->finished())
             {
-                std::string s(buf->base, nread);
                 wsgi->execute();
                 // support keep-alive
                 if (wsgi->SERVER_CLOSED || !wsgi->keepalive())
