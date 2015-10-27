@@ -6,10 +6,10 @@ from cStringIO import StringIO
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
-from cython.operator cimport dereference as iter_decr
-from cython.operator cimport preincrement as iter_inc
+from cpython cimport PyBytes_FromStringAndSize
 
 __VERSION__ = '0.1.0'
+__HY_VERSION__ = tuple([int(x) for x in __VERSION__.split('.')])
 
 
 # ----------------------------------------------
@@ -43,7 +43,7 @@ cdef extern from "../src/wsgi.h" namespace "hydrus":
         int SERVER_PORT
         bint SERVER_CLOSED
         string URL
-        string BODY
+        vector[char] BODY
         string CONTENT_TYPE
         unsigned long long CONTENT_LENGTH
         vector[WSGIHeader] HEADERS
@@ -68,14 +68,14 @@ cdef class _HydrusResponse:
     cdef str status
     cdef WSGIApplication* wsgi
     cdef basestring response_content
-    cdef list headers
+    cdef list response_headers
     cdef dict env
 
     def __init__(self):
         self.wsgi = NULL
         self.status = None
         self.response_content = ''
-        self.headers = []
+        self.response_headers = []
         self.env = {}
 
     cdef void raise_error(self, int code):
@@ -84,7 +84,7 @@ cdef class _HydrusResponse:
     cdef dict environ_vars(self):
         cdef dict env = {}
         cdef bytes url = <bytes>self.wsgi.URL
-        cdef bytes body = <bytes>self.wsgi.BODY
+        cdef bytes body = PyBytes_FromStringAndSize(self.wsgi.BODY.data(), self.wsgi.BODY.size())
         cdef bytes server_name = <bytes>self.wsgi.SERVER_NAME
         cdef int server_port = self.wsgi.SERVER_PORT
         cdef bytes request_method = <bytes>self.wsgi.REQUEST_METHOD
@@ -96,10 +96,9 @@ cdef class _HydrusResponse:
         cdef bytes qs = b'' if queryPos < 0 else url[queryPos+1:]
         cdef bytes path = url if queryPos < 0 else url[:queryPos]
 
-        env['HEADERS'] = []
         env['SERVER_SOFTWARE'] = 'hydrus %s' % __VERSION__
         env['SERVER_NAME'] = server_name
-        env['SERVER_PORT'] = str(server_port)
+        env['SERVER_PORT'] = server_port
         env['SERVER_PROTOCOL'] = 'HTTP/1.1'
         env['REQUEST_METHOD'] = request_method
         env['REMOTE_ADDR'] = remote_addr
@@ -114,17 +113,18 @@ cdef class _HydrusResponse:
         
         # env['wsgi.file_wrapper'] = None
         env['SCRIPT_NAME'] = ''
-        env['wsgi.version'] = (0, 1, 0)
+        env['wsgi.version'] = __HY_VERSION__
         env['wsgi.multithread'] = False
         env['wsgi.multiprocess'] = True
         env['wsgi.run_once'] = False
         env['wsgi.url_scheme'] = 'http'
 
+        # Set request header
         cdef int n = self.wsgi.HEADERS.size()
         for i in range(n):
             name = self.wsgi.HEADERS[i].name.c_str()
             value = self.wsgi.HEADERS[i].value.c_str()
-            env[name] = value
+            env['HTTP_' + name.upper().replace('-', '_')] = value
 
         self.env = env
         return env
@@ -133,8 +133,9 @@ cdef class _HydrusResponse:
         cdef bint hasContentLength = 0
         cdef bint hasTransferEncoding = 0
         cdef bint hasConnectionClosed = 0
+        cdef str bufs = ''
         if not self.response_content:
-            for name, val in self.headers:
+            for name, val in self.response_headers:
                 if name == 'Content-Length':
                     hasContentLength = 1
                 elif name == 'Transfer-Encoding':
@@ -152,14 +153,17 @@ cdef class _HydrusResponse:
             else:
                 # if `Connection:close` was not specified, but not keepalive (For HTTP 1.1)
                 if not hasConnectionClosed:
-                    self.response_content += 'Connection:close\r\n'
-            
-            
+                    self.response_content += 'Connection:close\r\n'           
 
-            header = '%s%s' % (self.status, self.response_content)
-            self.wsgi.send(header, len(header))
+            bufs += self.status
+            bufs += self.response_content
+            # header = '%s%s' % (self.status, self.response_content)
+            # self.wsgi.send(header, len(header))
         if data:
-             self.wsgi.send(data, len(data))
+            bufs += data
+            #  self.wsgi.send(data, len(data))
+        if bufs:
+            self.wsgi.send(bufs, len(bufs))
 
 
     def start_response(self, const char * status, headers, exec_info=None):
@@ -171,10 +175,10 @@ cdef class _HydrusResponse:
                 exec_info = None
 
         # Add special headers
-        headers += self.env['HEADERS'] + [('Server', self.env['SERVER_SOFTWARE'])]
+        headers.append(('Server', self.env['SERVER_SOFTWARE']))
 
         self.status = 'HTTP/1.1 %s\r\n' % status
-        self.headers = headers
+        self.response_headers = headers
         self.write(b'\r\n')
 
 

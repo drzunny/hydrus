@@ -49,7 +49,7 @@ namespace hydrus
         Str                     REQUEST_METHOD;
         Str                     REMOTE_ADDR;
         Str                     URL;
-        Str                     BODY;
+        std::vector<char>       BODY;
         std::vector<WSGIHeader> HEADERS;
 
     private:

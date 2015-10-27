@@ -72,6 +72,19 @@ _stringToUint64(const string & s)
 }
 
 
+inline static void
+_appendBody(vector<char> & body, const char * data, size_t len)
+{
+    if (body.size() + len > body.capacity())
+    {
+        size_t extend = body.size() > 0 ? body.size() * 2 : len * 2;
+        body.reserve(extend);
+    }
+    body.insert(body.end(), data, data + len);    
+}
+
+
+
 // -----------------------------------
 //  UV callbacks
 // -----------------------------------
@@ -104,6 +117,12 @@ fs_on_sendfile(uv_fs_t * fs)
 static int
 parser_on_begin(http_parser * pa)
 {
+    // because the connection maybe keep-alive
+    // the `finished` flag must be reset when parser is begin
+    // and `BODY` data must be clear (not shrink_to_fit) too
+    auto wsgi = _WSGI(pa);
+    wsgi->setFinished(false);
+    wsgi->BODY.clear();
     return 0;
 }
 
@@ -121,7 +140,9 @@ static int
 parser_on_body(http_parser* pa, const char *at, size_t length)
 {
     auto wsgi = _WSGI(pa);
-    wsgi->BODY = string(at, length);
+
+    // append the body content
+    _appendBody(wsgi->BODY, at, length);
     return 0;
 }
 
@@ -151,6 +172,7 @@ parser_on_header_value(http_parser* pa, const char *at, size_t length)
     client->tValue = string(at, length);
     client->openning = false;
 
+    // 'Content-Length' and 'Content-Type' are not inclueded in HTTP request headers list
     if (client->tName.compare("Content-Type") == 0)
     {
         wsgi->CONTENT_TYPE = client->tValue;
@@ -159,8 +181,8 @@ parser_on_header_value(http_parser* pa, const char *at, size_t length)
     {
         wsgi->CONTENT_LENGTH = _stringToUint64(client->tValue);
     }
-
-    wsgi->HEADERS.push_back({ client->tName, client->tValue });
+    else
+        wsgi->HEADERS.push_back({ client->tName, client->tValue });
     return 0;
 }
 
@@ -231,6 +253,9 @@ WSGIApplication::WSGIApplication() :
 {
     // for headers
     HEADERS.reserve(16);
+
+    // for BODY
+    BODY.reserve(4 * 1024);
 
     // for libuv
     client_ = new WSGIClient();
