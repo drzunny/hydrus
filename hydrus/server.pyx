@@ -215,6 +215,8 @@ cdef void _hydrus_response_callback(WSGIApplication & wsgi):
 # ----------------------------------------------
 def listen(app, const char* addr, int port):
     global G_hy_app
+    if not callable(app):
+        raise RuntimeError('WSGI application must be callable')
     if G_hy_app is not None:
         return
     G_hy_app = app
