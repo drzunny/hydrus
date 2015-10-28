@@ -67,15 +67,15 @@ G_hy_app = None
 cdef class _HydrusResponse:
     cdef str status
     cdef WSGIApplication* wsgi
-    cdef basestring response_content
-    cdef list response_headers
+    cdef list headers
     cdef dict env
+    cdef bint has_header_complete
 
     def __init__(self):
         self.wsgi = NULL
         self.status = None
-        self.response_content = ''
-        self.response_headers = []
+        self.headers = None
+        self.has_header_complete = 0
         self.env = {}
 
     cdef void raise_error(self, int code):
@@ -123,50 +123,56 @@ cdef class _HydrusResponse:
         cdef int n = self.wsgi.HEADERS.size()
         for i in range(n):
             name = self.wsgi.HEADERS[i].name.c_str()
-            value = self.wsgi.HEADERS[i].value.c_str()
-            env['HTTP_' + name.upper().replace('-', '_')] = value
+            value = self.wsgi.HEADERS[i].value.c_str()           
+            # set request header value to HTTP_variable
+            env['_'.join(('HTTP', name.upper().replace('-', '_')))] = value
 
         self.env = env
         return env
 
-    def write(self, bytes data):
+    def send_http_header(self):
         cdef bint hasContentLength = 0
         cdef bint hasTransferEncoding = 0
         cdef bint hasConnectionClosed = 0
-        cdef str bufs = ''
-        if not self.response_content:
-            for name, val in self.response_headers:
-                if name == 'Content-Length':
-                    hasContentLength = 1
-                elif name == 'Transfer-Encoding':
-                    hasTransferEncoding = 1
-                elif name == 'Connection' and val.lower() == 'close':
-                    self.wsgi.SERVER_CLOSED = 1
-                    hasConnectionClosed = 1
-                self.response_content += '%s:%s\r\n' % (name, val)
+        cdef list headers = [self.status]
+        cdef basestring header_buffer = None
+        
+        if self.has_header_complete:
+            return
+        
+        for it in self.headers:
+            name, value = it
+            if name == 'Content-Length':
+                hasContentLength = 1
+            elif name == 'Transfer-Encoding':
+                hasTransferEncoding = 1
+            elif name == 'Connection' and value.lower() == 'close':
+                self.wsgi.SERVER_CLOSED = 1
+                hasConnectionClosed = 1
             
-            # is keepalive connection ?            
-            if self.wsgi.keepalive():
-                # if `Content-Length` was not specified, use chunked mode
-                if not hasContentLength and not hasTransferEncoding:
-                    self.response_content += '%s:%s\r\n' % ('Transfer-Encoding', 'chunked')
-            else:
-                # if `Connection:close` was not specified, but not keepalive (For HTTP 1.1)
-                if not hasConnectionClosed:
-                    self.response_content += 'Connection:close\r\n'           
-
-            bufs += self.status
-            bufs += self.response_content
-        if data:
-            bufs += data
-        if bufs:
-            self.wsgi.send(bufs, len(bufs))
-
+            headers.append(':'.join(it))
+        
+        # is keepalive connection ?
+        if self.wsgi.keepalive():
+            # if both `Transfer-Encoding` and `Content-Length` were not specified, close connection 
+            if not hasContentLength and not hasTransferEncoding:
+                self.wsgi.SERVER_CLOSED = 1
+                headers.append('Connection:close')            
+        else:
+            # if `Connection:close` was not specified, but not keepalive (For HTTP 1.1)
+            if not hasConnectionClosed:
+                self.wsgi.SERVER_CLOSED = 1
+                headers.append('Connection:close')            
+        
+        headers.append('\r\n')
+        header_buffer = '\r\n'.join(headers)        
+        self.wsgi.send(header_buffer, len(header_buffer))
+        self.has_header_complete = True
 
     def start_response(self, const char * status, headers, exec_info=None):
         if exec_info:
             try:
-                if self.response_content:
+                if self.has_header_complete:
                     raise exec_info[0], exec_info[1], exec_info[2]
             except:
                 exec_info = None
@@ -174,9 +180,9 @@ cdef class _HydrusResponse:
         # Add special headers
         headers.append(('Server', self.env['SERVER_SOFTWARE']))
 
-        self.status = 'HTTP/1.1 %s\r\n' % status
-        self.response_headers = headers
-        self.write(b'\r\n')
+        self.status = 'HTTP/1.1 %s' % status
+        self.headers = headers
+        self.send_http_header()
 
 
 cdef void _hydrus_response_callback(WSGIApplication & wsgi):
@@ -187,12 +193,17 @@ cdef void _hydrus_response_callback(WSGIApplication & wsgi):
 
     try:
         retval = G_hy_app(environ, response.start_response)
-        for rs in retval:
-            if isinstance(rs, file):
-                nread = _file_size(rs)
-                wsgi.sendFile(rs.fileno(), nread)
-            else:
-                wsgi.send(rs, len(rs))
+        if not retval:
+            wsgi.send(' ', 1)
+        else:
+            for rs in retval:
+                if not rs:
+                    continue
+                if isinstance(rs, file):
+                    nread = _file_size(rs)
+                    wsgi.sendFile(rs.fileno(), nread)
+                else:
+                    wsgi.send(rs, len(rs))
     except:
         import traceback
         traceback.print_exc()
